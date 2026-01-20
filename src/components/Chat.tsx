@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
     Send, Bot, User, Loader2, Settings,
-    Menu, X, Plus, LogIn, LogOut, History, ChevronRight, Sparkles
+    Menu, X, Plus, LogIn, LogOut, History, ChevronRight, Sparkles, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +21,15 @@ interface ChatSession {
     title: string;
     created_at: string;
     messages: Message[];
+    gpt_id?: string | null;
+}
+
+interface CustomGpt {
+    id: string;
+    name: string;
+    description: string;
+    instructions: string;
+    icon_url?: string;
 }
 
 interface CustomUser {
@@ -41,6 +50,10 @@ export default function Chat() {
         systemPrompt: "You are a helpful and concise AI assistant.",
         maxHistory: 10,
     });
+    const [customGpts, setCustomGpts] = useState<CustomGpt[]>([]);
+    const [isGptModalOpen, setIsGptModalOpen] = useState(false);
+    const [editingGpt, setEditingGpt] = useState<CustomGpt | null>(null);
+    const [isGptSaving, setIsGptSaving] = useState(false);
 
     const supabase = createClient();
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -63,7 +76,8 @@ export default function Chat() {
             if (currentUser) {
                 await Promise.all([
                     loadRemoteSessions(currentUser.id),
-                    loadRemotePreferences(currentUser.id)
+                    loadRemotePreferences(currentUser.id),
+                    loadCustomGpts(currentUser.id)
                 ]);
             }
             // Always start with a new chat on landing
@@ -83,7 +97,8 @@ export default function Chat() {
                 setUser(supabaseUser);
                 await Promise.all([
                     loadRemoteSessions(supabaseUser.id),
-                    loadRemotePreferences(supabaseUser.id)
+                    loadRemotePreferences(supabaseUser.id),
+                    loadCustomGpts(supabaseUser.id)
                 ]);
                 if (event === "SIGNED_IN") {
                     createNewChat();
@@ -137,6 +152,17 @@ export default function Chat() {
             console.error("Error loading remote sessions:", err);
         }
     };
+    const loadCustomGpts = async (userId: string) => {
+        const { data, error } = await supabase
+            .from("custom_gpts")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false });
+
+        if (!error && data) {
+            setCustomGpts(data);
+        }
+    };
 
     // Preferences Sync Logic
     const loadRemotePreferences = async (userId: string) => {
@@ -164,10 +190,10 @@ export default function Chat() {
     };
 
     // Session Management
-    const createNewChat = () => {
-        // If the current active session is already empty, don't create a new one
+    const createNewChat = (gptId: string | null = null) => {
+        // If the current active session is already empty and matches the gptId, don't create a new one
         const currentActive = sessions.find(s => s.id === activeSessionId);
-        if (currentActive && currentActive.messages.length === 0) {
+        if (currentActive && currentActive.messages.length === 0 && currentActive.gpt_id === gptId) {
             return;
         }
 
@@ -176,6 +202,7 @@ export default function Chat() {
             title: "New Conversation",
             created_at: new Date().toISOString(),
             messages: [],
+            gpt_id: gptId
         };
         setSessions(prev => [newSession, ...prev]);
         setActiveSessionId(newSession.id);
@@ -214,7 +241,8 @@ export default function Chat() {
                     await supabase.from("chats").insert({
                         id: chatId,
                         user_id: user.id,
-                        title: input.slice(0, 30)
+                        title: input.slice(0, 30),
+                        gpt_id: activeSession?.gpt_id
                     });
                 }
                 await supabase.from("messages").insert({
@@ -225,13 +253,22 @@ export default function Chat() {
                 });
             }
 
+            // Get system prompt based on GPT association
+            let systemPrompt = preferences.systemPrompt;
+            if (activeSession?.gpt_id) {
+                const gpt = customGpts.find(g => g.id === activeSession.gpt_id);
+                if (gpt) {
+                    systemPrompt = gpt.instructions;
+                }
+            }
+
             // 2. Call API
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     messages: [
-                        { role: "system", content: preferences.systemPrompt },
+                        { role: "system", content: systemPrompt },
                         ...updatedMessages.slice(-preferences.maxHistory),
                     ],
                 }),
@@ -274,6 +311,121 @@ export default function Chat() {
         <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans">
             <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
+            {/* Custom GPT Modal */}
+            <AnimatePresence>
+                {isGptModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+                        >
+                            <div className="p-8">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                                        {editingGpt ? "Edit GPT" : "Create GPT"}
+                                    </h2>
+                                    <button onClick={() => { setIsGptModalOpen(false); setEditingGpt(null); }} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                                        <X className="w-6 h-6 text-zinc-500" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {(!user && isGptModalOpen) && (
+                                        <div className="p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-medium">
+                                            You must be signed in to create custom AI personalities.
+                                        </div>
+                                    )}
+                                    <form onSubmit={async (e) => {
+                                        e.preventDefault();
+                                        if (!user) {
+                                            setIsAuthModalOpen(true);
+                                            return;
+                                        }
+
+                                        setIsGptSaving(true);
+                                        try {
+                                            const formData = new FormData(e.currentTarget);
+                                            const name = formData.get("name") as string;
+                                            const instructions = formData.get("instructions") as string;
+                                            const description = formData.get("description") as string;
+
+                                            console.log("Saving GPT with user:", user.id);
+                                            const savePromise = editingGpt
+                                                ? supabase.from("custom_gpts").update({ name, instructions, description }).eq("id", editingGpt.id)
+                                                : supabase.from("custom_gpts").insert({ user_id: user.id, name, instructions, description });
+
+                                            // Timeout after 10 seconds
+                                            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database operation timed out.")), 10000));
+
+                                            const result: any = await Promise.race([savePromise, timeoutPromise]);
+
+                                            if (result.error) {
+                                                console.error("Supabase Error:", result.error);
+                                                throw new Error(result.error.message);
+                                            }
+
+                                            console.log("GPT saved successfully, refreshing list...");
+                                            await loadCustomGpts(user.id);
+                                            setIsGptModalOpen(false);
+                                            setEditingGpt(null);
+                                        } catch (err) {
+                                            console.error("Error saving GPT:", err);
+                                            const msg = err instanceof Error ? err.message : "Failed to save GPT.";
+                                            alert(`${msg}\n\nNote: If you're using manual session, ensure RLS is disabled on the custom_gpts table or policies allow your session ID.`);
+                                        } finally {
+                                            setIsGptSaving(false);
+                                        }
+                                    }} className="space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Name</label>
+                                            <input
+                                                name="name"
+                                                required
+                                                defaultValue={editingGpt?.name}
+                                                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all dark:text-zinc-100"
+                                                placeholder="e.g., Creative Writer"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Description</label>
+                                            <input
+                                                name="description"
+                                                defaultValue={editingGpt?.description}
+                                                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all dark:text-zinc-100"
+                                                placeholder="What does this GPT do?"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Instructions</label>
+                                            <textarea
+                                                name="instructions"
+                                                required
+                                                defaultValue={editingGpt?.instructions}
+                                                className="w-full h-32 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none dark:text-zinc-100"
+                                                placeholder="Detailed behavior instructions..."
+                                            />
+                                        </div>
+                                        <button
+                                            disabled={isGptSaving}
+                                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            {isGptSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingGpt ? "Save Changes" : "Create AI Personality")}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Sidebar */}
             <motion.aside
                 initial={false}
@@ -282,29 +434,85 @@ export default function Chat() {
             >
                 <div className="p-4 flex flex-col h-full">
                     <button
-                        onClick={createNewChat}
+                        onClick={() => createNewChat()}
                         className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
                     >
                         <Plus className="w-5 h-5" />
                         New Chat
                     </button>
 
-                    <div className="flex-1 mt-6 overflow-y-auto scrollbar-hide space-y-2">
-                        <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">History</h3>
-                        {sessions.map(s => (
+                    <div className="flex-1 mt-6 overflow-y-auto scrollbar-hide space-y-6">
+                        <div>
+                            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">My GPTs</h3>
                             <button
-                                key={s.id}
-                                onClick={() => setActiveSessionId(s.id)}
-                                className={cn(
-                                    "w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors group",
-                                    activeSessionId === s.id ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
-                                )}
+                                onClick={() => setIsGptModalOpen(true)}
+                                className="w-full text-left p-3 rounded-lg flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 transition-colors group mb-2"
                             >
-                                <History className="w-4 h-4 flex-shrink-0" />
-                                <span className="truncate text-sm font-medium">{s.title}</span>
-                                <ChevronRight className={cn("w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity", activeSessionId === s.id && "opacity-100")} />
+                                <Plus className="w-4 h-4" />
+                                <span className="text-sm font-bold">Create GPT</span>
                             </button>
-                        ))}
+                            <div className="space-y-1">
+                                {customGpts.map(gpt => (
+                                    <div key={gpt.id} className="group relative">
+                                        <button
+                                            onClick={() => createNewChat(gpt.id)}
+                                            className={cn(
+                                                "w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors",
+                                                activeSession?.gpt_id === gpt.id ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                                            )}
+                                        >
+                                            <Sparkles className="w-4 h-4 flex-shrink-0" />
+                                            <span className="truncate text-sm font-medium">{gpt.name}</span>
+                                        </button>
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditingGpt(gpt); setIsGptModalOpen(true); }}
+                                                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-all"
+                                                title="Edit GPT"
+                                            >
+                                                <Settings className="w-3 h-3 text-zinc-500" />
+                                            </button>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm(`Are you sure you want to delete "${gpt.name}"?`)) {
+                                                        await supabase.from("custom_gpts").delete().eq("id", gpt.id);
+                                                        if (user) loadCustomGpts(user.id);
+                                                        if (activeSession?.gpt_id === gpt.id) {
+                                                            setSessions(prev => prev.map(s => s.gpt_id === gpt.id ? { ...s, gpt_id: null } : s));
+                                                        }
+                                                    }
+                                                }}
+                                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded-md transition-all"
+                                                title="Delete GPT"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">History</h3>
+                            <div className="space-y-1">
+                                {sessions.map(s => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => setActiveSessionId(s.id)}
+                                        className={cn(
+                                            "w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors group",
+                                            activeSessionId === s.id ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                                        )}
+                                    >
+                                        <History className="w-4 h-4 flex-shrink-0" />
+                                        <span className="truncate text-sm font-medium">{s.title}</span>
+                                        <ChevronRight className={cn("w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity", activeSessionId === s.id && "opacity-100")} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="pt-4 mt-auto border-t border-zinc-100 dark:border-zinc-800">
@@ -442,8 +650,16 @@ export default function Chat() {
                                     <Bot className="w-10 h-10 text-indigo-600" />
                                 </motion.div>
                                 <div className="space-y-2">
-                                    <h2 className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">What&apos;s on your mind?</h2>
-                                    <p className="text-zinc-500 max-w-sm mx-auto">Ask anything to Llama 3.3. Your thoughts are safe with our hybrid persistence.</p>
+                                    <h2 className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
+                                        {activeSession?.gpt_id
+                                            ? `Chat with ${customGpts.find(g => g.id === activeSession.gpt_id)?.name || "Custom AI"}`
+                                            : "What's on your mind?"}
+                                    </h2>
+                                    <p className="text-zinc-500 max-w-sm mx-auto">
+                                        {activeSession?.gpt_id
+                                            ? customGpts.find(g => g.id === activeSession.gpt_id)?.description || "This custom AI is ready to help."
+                                            : "Ask anything to Llama 3.3. Your thoughts are safe with our hybrid persistence."}
+                                    </p>
                                 </div>
                             </div>
                         )}
