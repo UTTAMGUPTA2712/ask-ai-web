@@ -7,8 +7,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import AuthModal from "./AuthModal";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+const AuthModal = dynamic(() => import("./AuthModal"), { ssr: false });
+const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
+import remarkGfm from "remark-gfm";
 interface Message {
     id?: string;
     role: "user" | "assistant" | "system";
@@ -29,6 +33,8 @@ interface CustomGpt {
     name: string;
     description: string;
     instructions: string;
+    is_public: boolean;
+    user_id: string;
     icon_url?: string;
 }
 
@@ -79,6 +85,8 @@ export default function Chat() {
                     loadRemotePreferences(currentUser.id),
                     loadCustomGpts(currentUser.id)
                 ]);
+            } else {
+                await loadCustomGpts(null);
             }
             // Always start with a new chat on landing
             createNewChat();
@@ -152,12 +160,16 @@ export default function Chat() {
             console.error("Error loading remote sessions:", err);
         }
     };
-    const loadCustomGpts = async (userId: string) => {
-        const { data, error } = await supabase
-            .from("custom_gpts")
-            .select("*")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false });
+    const loadCustomGpts = async (userId: string | null) => {
+        let query = supabase.from("custom_gpts").select("*");
+
+        if (userId) {
+            query = query.or(`user_id.eq.${userId},is_public.eq.true`);
+        } else {
+            query = query.eq("is_public", true);
+        }
+
+        const { data, error } = await query.order("created_at", { ascending: false });
 
         if (!error && data) {
             setCustomGpts(data);
@@ -355,11 +367,12 @@ export default function Chat() {
                                             const name = formData.get("name") as string;
                                             const instructions = formData.get("instructions") as string;
                                             const description = formData.get("description") as string;
+                                            const is_public = formData.get("is_public") === "on";
 
                                             console.log("Saving GPT with user:", user.id);
                                             const savePromise = editingGpt
-                                                ? supabase.from("custom_gpts").update({ name, instructions, description }).eq("id", editingGpt.id)
-                                                : supabase.from("custom_gpts").insert({ user_id: user.id, name, instructions, description });
+                                                ? supabase.from("custom_gpts").update({ name, instructions, description, is_public }).eq("id", editingGpt.id)
+                                                : supabase.from("custom_gpts").insert({ user_id: user.id, name, instructions, description, is_public });
 
                                             // Timeout after 10 seconds
                                             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database operation timed out.")), 10000));
@@ -412,6 +425,18 @@ export default function Chat() {
                                                 placeholder="Detailed behavior instructions..."
                                             />
                                         </div>
+                                        <div className="flex items-center gap-3 py-2">
+                                            <input
+                                                type="checkbox"
+                                                name="is_public"
+                                                id="is_public"
+                                                defaultChecked={editingGpt?.is_public}
+                                                className="w-5 h-5 accent-indigo-600 rounded-lg cursor-pointer"
+                                            />
+                                            <label htmlFor="is_public" className="text-sm font-bold text-zinc-600 dark:text-zinc-300 cursor-pointer">
+                                                Public GPT <span className="text-[10px] font-normal text-zinc-400 block tracking-normal uppercase">Visible to everyone in the community</span>
+                                            </label>
+                                        </div>
                                         <button
                                             disabled={isGptSaving}
                                             className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
@@ -441,7 +466,7 @@ export default function Chat() {
                         New Chat
                     </button>
 
-                    <div className="flex-1 mt-6 overflow-y-auto scrollbar-hide space-y-6">
+                    <div className="flex-1 mt-6 overflow-y-auto scrollbar-hide space-y-8">
                         <div>
                             <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">My GPTs</h3>
                             <button
@@ -452,7 +477,7 @@ export default function Chat() {
                                 <span className="text-sm font-bold">Create GPT</span>
                             </button>
                             <div className="space-y-1">
-                                {customGpts.map(gpt => (
+                                {customGpts.filter(g => g.user_id === user?.id).map(gpt => (
                                     <div key={gpt.id} className="group relative">
                                         <button
                                             onClick={() => createNewChat(gpt.id)}
@@ -463,6 +488,7 @@ export default function Chat() {
                                         >
                                             <Sparkles className="w-4 h-4 flex-shrink-0" />
                                             <span className="truncate text-sm font-medium">{gpt.name}</span>
+                                            {gpt.is_public && <span className="ml-auto text-[8px] font-bold text-indigo-500 border border-indigo-500/30 px-1 rounded uppercase tracking-tighter">Public</span>}
                                         </button>
                                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                                             <button
@@ -493,6 +519,27 @@ export default function Chat() {
                                 ))}
                             </div>
                         </div>
+
+                        {customGpts.filter(g => g.is_public && g.user_id !== user?.id).length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">Community GPTs</h3>
+                                <div className="space-y-1">
+                                    {customGpts.filter(g => g.is_public && g.user_id !== user?.id).map(gpt => (
+                                        <button
+                                            key={gpt.id}
+                                            onClick={() => createNewChat(gpt.id)}
+                                            className={cn(
+                                                "w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors",
+                                                activeSession?.gpt_id === gpt.id ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                                            )}
+                                        >
+                                            <Bot className="w-4 h-4 flex-shrink-0" />
+                                            <span className="truncate text-sm font-medium">{gpt.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div>
                             <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">History</h3>
@@ -682,12 +729,37 @@ export default function Chat() {
                                         {m.role === "user" ? <User className="w-5 h-5 text-zinc-600 dark:text-zinc-400" /> : <Bot className="w-5 h-5 text-white" />}
                                     </div>
                                     <div className={cn(
-                                        "max-w-[80%] px-5 py-3 rounded-3xl text-sm leading-relaxed",
+                                        "max-w-[80%] px-5 py-3 rounded-3xl text-sm leading-relaxed prose dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-code:before:content-none prose-code:after:content-none",
                                         m.role === "user"
-                                            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-tr-none"
+                                            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-tr-none prose-p:text-white dark:prose-p:text-zinc-900"
                                             : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-tl-none shadow-sm"
                                     )}>
-                                        {m.content}
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                code({ node, className, children, ...props }: any) {
+                                                    const match = /language-(\w+)/.exec(className || '');
+                                                    return match ? (
+                                                        <div className="relative group/code my-4">
+                                                            <div className="absolute -top-3 left-4 px-2 py-0.5 bg-zinc-700 text-[10px] text-zinc-300 rounded-md font-mono uppercase tracking-widest z-10 border border-zinc-600">
+                                                                {match[1]}
+                                                            </div>
+                                                            <pre className="overflow-x-auto p-4 rounded-xl bg-zinc-800 dark:bg-black border border-zinc-700 dark:border-zinc-800 mt-2">
+                                                                <code className={className} {...props}>
+                                                                    {children}
+                                                                </code>
+                                                            </pre>
+                                                        </div>
+                                                    ) : (
+                                                        <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-md font-mono text-xs text-indigo-600 dark:text-indigo-400" {...props}>
+                                                            {children}
+                                                        </code>
+                                                    )
+                                                }
+                                            }}
+                                        >
+                                            {m.content}
+                                        </ReactMarkdown>
                                     </div>
                                 </motion.div>
                             ))}
