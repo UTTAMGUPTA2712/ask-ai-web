@@ -24,47 +24,44 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
         try {
             if (isSignUp) {
-                // 1. Sign up with Supabase Auth (hashes password by default)
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email,
-                    password,
+                // Manual Sign Up: Insert directly into profiles table
+                const userId = crypto.randomUUID();
+                const { error: profileError } = await supabase.from("profiles").insert({
+                    id: userId,
+                    email: email,
+                    password: password, // Storing as normal string as requested
+                    updated_at: new Date().toISOString(),
                 });
-                if (authError) throw authError;
 
-                if (authData.user) {
-                    // 2. Store plain text password in profiles table
-                    const { error: profileError } = await supabase.from("profiles").upsert({
-                        id: authData.user.id,
-                        email: email,
-                        password: password, // Storing as normal string as requested
-                        updated_at: new Date().toISOString(),
-                    });
-                    if (profileError) console.error("Profile Error:", profileError);
+                if (profileError) {
+                    if (profileError.code === "23505") throw new Error("User already exists.");
+                    throw profileError;
                 }
 
-                setMessage("Account created! Check your email for confirmation.");
+                // Auto sign in after sign up
+                const userData = { id: userId, email: email };
+                localStorage.setItem("manual-session", JSON.stringify(userData));
+                onClose();
+                window.location.reload();
             } else {
-                // 1. Custom validation: Check plain text password in profiles table
+                // Manual Sign In: Match email and plain text password
                 const { data: profile, error: profileError } = await supabase
                     .from("profiles")
-                    .select("password")
+                    .select("id, email, password")
                     .eq("email", email)
                     .single();
 
                 if (profileError || !profile) {
-                    throw new Error("User not found or invalid credentials.");
+                    throw new Error("Invalid email or password.");
                 }
 
                 if (profile.password !== password) {
-                    throw new Error("Invalid password.");
+                    throw new Error("Invalid email or password.");
                 }
 
-                // 2. If valid, proceed with Supabase Auth sign in
-                const { error: authError } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (authError) throw authError;
+                // Store session manually
+                const userData = { id: profile.id, email: profile.email };
+                localStorage.setItem("manual-session", JSON.stringify(userData));
 
                 onClose();
                 window.location.reload();

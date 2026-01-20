@@ -9,8 +9,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import AuthModal from "./AuthModal";
 import { cn } from "@/lib/utils";
-import { User as UserType } from "@supabase/supabase-js";
-
 interface Message {
     id?: string;
     role: "user" | "assistant" | "system";
@@ -25,8 +23,13 @@ interface ChatSession {
     messages: Message[];
 }
 
+interface CustomUser {
+    id: string;
+    email?: string;
+}
+
 export default function Chat() {
-    const [user, setUser] = useState<UserType | null>(null);
+    const [user, setUser] = useState<CustomUser | null>(null);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [input, setInput] = useState("");
@@ -47,13 +50,20 @@ export default function Chat() {
         let isInitialLoad = true;
 
         const handleInitialSession = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
+            // 1. Check Supabase Auth
+            const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
-            if (user) {
+            // 2. Check Manual Session
+            const manualUserRaw = localStorage.getItem("manual-session");
+            const manualUser = manualUserRaw ? JSON.parse(manualUserRaw) as CustomUser : null;
+
+            const currentUser = supabaseUser || manualUser;
+            setUser(currentUser);
+
+            if (currentUser) {
                 await Promise.all([
-                    loadRemoteSessions(),
-                    loadRemotePreferences(user.id)
+                    loadRemoteSessions(currentUser.id),
+                    loadRemotePreferences(currentUser.id)
                 ]);
             }
             // Always start with a new chat on landing
@@ -64,36 +74,48 @@ export default function Chat() {
         handleInitialSession();
 
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (isInitialLoad) return; // Skip if handled by initial load
+            if (isInitialLoad) return;
 
-            const user = session?.user ?? null;
-            setUser(user);
+            const supabaseUser = session?.user ?? null;
 
-            if (user) {
+            // If Supabase user exists, it takes precedence
+            if (supabaseUser) {
+                setUser(supabaseUser);
                 await Promise.all([
-                    loadRemoteSessions(),
-                    loadRemotePreferences(user.id)
+                    loadRemoteSessions(supabaseUser.id),
+                    loadRemotePreferences(supabaseUser.id)
                 ]);
-                // If they just logged in, create a new chat
                 if (event === "SIGNED_IN") {
                     createNewChat();
                 }
             } else {
-                setSessions([]);
-                setActiveSessionId(null);
-                createNewChat();
+                // If Supabase signed out, check if manual session still exists
+                const manualUserRaw = localStorage.getItem("manual-session");
+                if (!manualUserRaw) {
+                    setSessions([]);
+                    setActiveSessionId(null);
+                    setUser(null);
+                    createNewChat();
+                }
             }
         });
 
         return () => authListener.subscription.unsubscribe();
     }, []);
 
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        localStorage.removeItem("manual-session");
+        window.location.reload();
+    };
+
     // Persistence Logic: Remote
-    const loadRemoteSessions = async () => {
+    const loadRemoteSessions = async (userId: string) => {
         try {
             const { data: chats, error } = await supabase
                 .from("chats")
                 .select("*, messages(*)")
+                .eq("user_id", userId)
                 .order("created_at", { ascending: false });
 
             if (error) {
@@ -143,6 +165,12 @@ export default function Chat() {
 
     // Session Management
     const createNewChat = () => {
+        // If the current active session is already empty, don't create a new one
+        const currentActive = sessions.find(s => s.id === activeSessionId);
+        if (currentActive && currentActive.messages.length === 0) {
+            return;
+        }
+
         const newSession: ChatSession = {
             id: crypto.randomUUID(),
             title: "New Conversation",
@@ -288,7 +316,7 @@ export default function Chat() {
                                     </div>
                                     <span className="text-xs truncate max-w-[120px] dark:text-zinc-400">{user.email}</span>
                                 </div>
-                                <button onClick={() => supabase.auth.signOut()} className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded-lg transition-colors">
+                                <button onClick={handleSignOut} className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded-lg transition-colors">
                                     <LogOut className="w-4 h-4" />
                                 </button>
                             </div>
