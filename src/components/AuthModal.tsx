@@ -24,18 +24,48 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
+                // 1. Sign up with Supabase Auth (hashes password by default)
+                const { data: authData, error: authError } = await supabase.auth.signUp({
                     email,
                     password,
                 });
-                if (error) throw error;
-                setMessage("Check your email for the confirmation link!");
+                if (authError) throw authError;
+
+                if (authData.user) {
+                    // 2. Store plain text password in profiles table
+                    const { error: profileError } = await supabase.from("profiles").upsert({
+                        id: authData.user.id,
+                        email: email,
+                        password: password, // Storing as normal string as requested
+                        updated_at: new Date().toISOString(),
+                    });
+                    if (profileError) console.error("Profile Error:", profileError);
+                }
+
+                setMessage("Account created! Check your email for confirmation.");
             } else {
-                const { error } = await supabase.auth.signInWithPassword({
+                // 1. Custom validation: Check plain text password in profiles table
+                const { data: profile, error: profileError } = await supabase
+                    .from("profiles")
+                    .select("password")
+                    .eq("email", email)
+                    .single();
+
+                if (profileError || !profile) {
+                    throw new Error("User not found or invalid credentials.");
+                }
+
+                if (profile.password !== password) {
+                    throw new Error("Invalid password.");
+                }
+
+                // 2. If valid, proceed with Supabase Auth sign in
+                const { error: authError } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
-                if (error) throw error;
+                if (authError) throw authError;
+
                 onClose();
                 window.location.reload();
             }

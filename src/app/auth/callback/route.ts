@@ -32,8 +32,26 @@ export async function GET(request: NextRequest) {
                 },
             }
         );
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
+        const { data: { user }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (!exchangeError && user) {
+            // Sync Google user with profiles table and set a static password
+            const staticPassword = "password123"; // Static password for Google users
+
+            const { data: existingProfile } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (!existingProfile) {
+                await supabase.from("profiles").insert({
+                    id: user.id,
+                    email: user.email,
+                    password: staticPassword,
+                    updated_at: new Date().toISOString(),
+                });
+            }
+
             const forwardedHost = request.headers.get("x-forwarded-host"); // original origin before load balancer
             const isLocalEnv = process.env.NODE_ENV === "development";
             if (isLocalEnv) {

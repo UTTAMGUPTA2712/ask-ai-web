@@ -44,85 +44,49 @@ export default function Chat() {
 
     // Initialize: Get User & Load Data
     useEffect(() => {
-        const init = async () => {
+        let isInitialLoad = true;
+
+        const handleInitialSession = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
 
             if (user) {
-                await syncLocalToRemote(user.id);
                 await Promise.all([
                     loadRemoteSessions(),
                     loadRemotePreferences(user.id)
                 ]);
-            } else {
-                loadLocalSessions();
-                loadLocalPreferences();
             }
+            // Always start with a new chat on landing
+            createNewChat();
+            isInitialLoad = false;
         };
-        init();
+
+        handleInitialSession();
 
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (isInitialLoad) return; // Skip if handled by initial load
+
             const user = session?.user ?? null;
             setUser(user);
 
             if (user) {
-                await syncLocalToRemote(user.id);
                 await Promise.all([
                     loadRemoteSessions(),
                     loadRemotePreferences(user.id)
                 ]);
+                // If they just logged in, create a new chat
+                if (event === "SIGNED_IN") {
+                    createNewChat();
+                }
             } else {
-                loadLocalSessions();
-                loadLocalPreferences();
+                setSessions([]);
+                setActiveSessionId(null);
+                createNewChat();
             }
         });
 
         return () => authListener.subscription.unsubscribe();
     }, []);
-
-    const syncLocalToRemote = async (userId: string) => {
-        const local = localStorage.getItem("guest-sessions");
-        if (!local) return;
-
-        try {
-            const parsed = JSON.parse(local) as ChatSession[];
-            if (parsed.length === 0) return;
-
-            for (const session of parsed) {
-                // 1. Ensure chat exists
-                const { data: chat } = await supabase.from("chats").select("id").eq("id", session.id).maybeSingle();
-                if (!chat) {
-                    await supabase.from("chats").insert({
-                        id: session.id,
-                        user_id: userId,
-                        title: session.title,
-                        created_at: session.created_at
-                    });
-                }
-
-                // 2. Insert messages if they don't exist
-                const { data: remoteMsgs } = await supabase.from("messages").select("content").eq("chat_id", session.id);
-                const remoteContents = new Set(remoteMsgs?.map(m => m.content) || []);
-
-                const newMsgs = session.messages.filter(m => !remoteContents.has(m.content));
-                if (newMsgs.length > 0) {
-                    await supabase.from("messages").insert(
-                        newMsgs.map(m => ({
-                            chat_id: session.id,
-                            user_id: userId,
-                            role: m.role,
-                            content: m.content,
-                            created_at: m.created_at || new Date().toISOString()
-                        }))
-                    );
-                }
-            }
-            // Clear local guest sessions after sync
-            localStorage.removeItem("guest-sessions");
-        } catch (err) {
-            console.error("Sync Error:", err);
-        }
-    };
 
     // Persistence Logic: Remote
     const loadRemoteSessions = async () => {
@@ -146,29 +110,9 @@ export default function Chat() {
                 })) as ChatSession[];
 
                 setSessions(formatted);
-
-                // Set active session to the most recent one if we don't have one or if the current one isn't in the new list
-                if (formatted.length > 0) {
-                    const exists = formatted.some(s => s.id === activeSessionId);
-                    if (!activeSessionId || !exists) {
-                        setActiveSessionId(formatted[0].id);
-                    }
-                }
             }
         } catch (err) {
             console.error("Error loading remote sessions:", err);
-        }
-    };
-
-    // Persistence Logic: Local
-    const loadLocalSessions = () => {
-        const saved = localStorage.getItem("guest-sessions");
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            setSessions(parsed);
-            if (parsed.length > 0 && !activeSessionId) {
-                setActiveSessionId(parsed[0].id);
-            }
         }
     };
 
@@ -185,13 +129,6 @@ export default function Chat() {
         }
     };
 
-    const loadLocalPreferences = () => {
-        const saved = localStorage.getItem("chat-preferences");
-        if (saved) {
-            setPreferences(JSON.parse(saved));
-        }
-    };
-
     const updatePreference = async (key: string, value: string | number) => {
         const newPrefs = { ...preferences, [key]: value };
         setPreferences(newPrefs);
@@ -201,13 +138,7 @@ export default function Chat() {
                 system_prompt: newPrefs.systemPrompt,
                 updated_at: new Date().toISOString()
             }).eq("id", user.id);
-        } else {
-            localStorage.setItem("chat-preferences", JSON.stringify(newPrefs));
         }
-    };
-
-    const saveLocalSessions = (newSessions: ChatSession[]) => {
-        localStorage.setItem("guest-sessions", JSON.stringify(newSessions));
     };
 
     // Session Management
@@ -218,10 +149,8 @@ export default function Chat() {
             created_at: new Date().toISOString(),
             messages: [],
         };
-        const updated = [newSession, ...sessions];
-        setSessions(updated);
+        setSessions(prev => [newSession, ...prev]);
         setActiveSessionId(newSession.id);
-        if (!user) saveLocalSessions(updated);
     };
 
     const activeSession = sessions.find(s => s.id === activeSessionId) || null;
@@ -249,10 +178,7 @@ export default function Chat() {
         setInput("");
         setIsLoading(true);
 
-        if (!user) saveLocalSessions(updatedSessions);
-
         try {
-            // 1. If remote, insert chat if it doesn't exist (handled by createNewChat logic or here)
             const chatId = activeSessionId;
             if (user) {
                 const { data: currentChat } = await supabase.from("chats").select("id").eq("id", chatId).single();
@@ -308,10 +234,6 @@ export default function Chat() {
                     role: "assistant",
                     content: assistantContent
                 });
-            } else {
-                saveLocalSessions(
-                    sessions.map(s => s.id === activeSessionId ? { ...s, messages: [...updatedMessages, { role: "assistant", content: assistantContent }] } : s)
-                );
             }
         } catch (err) {
             console.error(err);
