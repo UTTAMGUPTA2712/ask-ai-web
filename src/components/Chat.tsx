@@ -1,60 +1,230 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Bot, User, Loader2, Trash2, Settings, Sparkles } from "lucide-react";
+import {
+    Send, Bot, User, Loader2, Settings,
+    Menu, X, Plus, LogIn, LogOut, History, ChevronRight, Sparkles
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
+import AuthModal from "./AuthModal";
+import { cn } from "@/lib/utils";
+import { User as UserType } from "@supabase/supabase-js";
 
 interface Message {
-    role: "user" | "assistant";
+    id?: string;
+    role: "user" | "assistant" | "system";
     content: string;
+    created_at?: string;
 }
 
-interface Preferences {
-    systemPrompt: string;
-    maxHistory: number;
+interface ChatSession {
+    id: string;
+    title: string;
+    created_at: string;
+    messages: Message[];
 }
 
 export default function Chat() {
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [user, setUser] = useState<UserType | null>(null);
+    const [sessions, setSessions] = useState<ChatSession[]>([]);
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [preferences, setPreferences] = useState<Preferences>({
+    const [preferences, setPreferences] = useState({
         systemPrompt: "You are a helpful and concise AI assistant.",
         maxHistory: 10,
     });
 
+    const supabase = createClient();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Load preferences from local storage
+    // Initialize: Get User & Load Data
     useEffect(() => {
-        const saved = localStorage.getItem("chat-preferences");
-        if (saved) {
-            try {
-                setPreferences(JSON.parse(saved));
-            } catch (e) {
-                console.error("Failed to parse preferences", e);
-            }
-        }
+        const init = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
 
-        const savedMessages = localStorage.getItem("chat-history");
-        if (savedMessages) {
-            try {
-                setMessages(JSON.parse(savedMessages));
-            } catch (e) {
-                console.error("Failed to parse history", e);
+            if (user) {
+                await syncLocalToRemote(user.id);
+                await Promise.all([
+                    loadRemoteSessions(),
+                    loadRemotePreferences(user.id)
+                ]);
+            } else {
+                loadLocalSessions();
+                loadLocalPreferences();
             }
-        }
+        };
+        init();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+            const user = session?.user ?? null;
+            setUser(user);
+
+            if (user) {
+                await syncLocalToRemote(user.id);
+                await Promise.all([
+                    loadRemoteSessions(),
+                    loadRemotePreferences(user.id)
+                ]);
+            } else {
+                loadLocalSessions();
+                loadLocalPreferences();
+            }
+        });
+
+        return () => authListener.subscription.unsubscribe();
     }, []);
 
-    // Save preferences to local storage
-    useEffect(() => {
-        localStorage.setItem("chat-preferences", JSON.stringify(preferences));
-    }, [preferences]);
+    const syncLocalToRemote = async (userId: string) => {
+        const local = localStorage.getItem("guest-sessions");
+        if (!local) return;
 
-    // Save history to local storage
-    useEffect(() => {
-        localStorage.setItem("chat-history", JSON.stringify(messages));
-    }, [messages]);
+        try {
+            const parsed = JSON.parse(local) as ChatSession[];
+            if (parsed.length === 0) return;
+
+            for (const session of parsed) {
+                // 1. Ensure chat exists
+                const { data: chat } = await supabase.from("chats").select("id").eq("id", session.id).maybeSingle();
+                if (!chat) {
+                    await supabase.from("chats").insert({
+                        id: session.id,
+                        user_id: userId,
+                        title: session.title,
+                        created_at: session.created_at
+                    });
+                }
+
+                // 2. Insert messages if they don't exist
+                const { data: remoteMsgs } = await supabase.from("messages").select("content").eq("chat_id", session.id);
+                const remoteContents = new Set(remoteMsgs?.map(m => m.content) || []);
+
+                const newMsgs = session.messages.filter(m => !remoteContents.has(m.content));
+                if (newMsgs.length > 0) {
+                    await supabase.from("messages").insert(
+                        newMsgs.map(m => ({
+                            chat_id: session.id,
+                            user_id: userId,
+                            role: m.role,
+                            content: m.content,
+                            created_at: m.created_at || new Date().toISOString()
+                        }))
+                    );
+                }
+            }
+            // Clear local guest sessions after sync
+            localStorage.removeItem("guest-sessions");
+        } catch (err) {
+            console.error("Sync Error:", err);
+        }
+    };
+
+    // Persistence Logic: Remote
+    const loadRemoteSessions = async () => {
+        try {
+            const { data: chats, error } = await supabase
+                .from("chats")
+                .select("*, messages(*)")
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                console.error("Supabase Error loading chats:", error);
+                return;
+            }
+
+            if (chats) {
+                const formatted = chats.map((c) => ({
+                    ...c,
+                    messages: (c.messages as Message[]).sort((a, b) =>
+                        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+                    )
+                })) as ChatSession[];
+
+                setSessions(formatted);
+
+                // Set active session to the most recent one if we don't have one or if the current one isn't in the new list
+                if (formatted.length > 0) {
+                    const exists = formatted.some(s => s.id === activeSessionId);
+                    if (!activeSessionId || !exists) {
+                        setActiveSessionId(formatted[0].id);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error loading remote sessions:", err);
+        }
+    };
+
+    // Persistence Logic: Local
+    const loadLocalSessions = () => {
+        const saved = localStorage.getItem("guest-sessions");
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            setSessions(parsed);
+            if (parsed.length > 0 && !activeSessionId) {
+                setActiveSessionId(parsed[0].id);
+            }
+        }
+    };
+
+    // Preferences Sync Logic
+    const loadRemotePreferences = async (userId: string) => {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("system_prompt")
+            .eq("id", userId)
+            .single();
+
+        if (profile?.system_prompt) {
+            setPreferences(prev => ({ ...prev, systemPrompt: profile.system_prompt }));
+        }
+    };
+
+    const loadLocalPreferences = () => {
+        const saved = localStorage.getItem("chat-preferences");
+        if (saved) {
+            setPreferences(JSON.parse(saved));
+        }
+    };
+
+    const updatePreference = async (key: string, value: string | number) => {
+        const newPrefs = { ...preferences, [key]: value };
+        setPreferences(newPrefs);
+
+        if (user) {
+            await supabase.from("profiles").update({
+                system_prompt: newPrefs.systemPrompt,
+                updated_at: new Date().toISOString()
+            }).eq("id", user.id);
+        } else {
+            localStorage.setItem("chat-preferences", JSON.stringify(newPrefs));
+        }
+    };
+
+    const saveLocalSessions = (newSessions: ChatSession[]) => {
+        localStorage.setItem("guest-sessions", JSON.stringify(newSessions));
+    };
+
+    // Session Management
+    const createNewChat = () => {
+        const newSession: ChatSession = {
+            id: crypto.randomUUID(),
+            title: "New Conversation",
+            created_at: new Date().toISOString(),
+            messages: [],
+        };
+        const updated = [newSession, ...sessions];
+        setSessions(updated);
+        setActiveSessionId(newSession.id);
+        if (!user) saveLocalSessions(updated);
+    };
+
+    const activeSession = sessions.find(s => s.id === activeSessionId) || null;
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,211 +232,342 @@ export default function Chat() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [activeSession?.messages, isLoading]);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if (!input.trim() || isLoading || !activeSessionId) return;
 
-        const userMessage: Message = { role: "user", content: input };
-        const newMessages = [...messages, userMessage];
-        setMessages(newMessages);
+        const userMsg: Message = { role: "user", content: input };
+        const updatedMessages = [...(activeSession?.messages || []), userMsg];
+
+        // Update local state immediately
+        const updatedSessions = sessions.map(s =>
+            s.id === activeSessionId ? { ...s, messages: updatedMessages, title: s.messages.length === 0 ? input.slice(0, 30) : s.title } : s
+        );
+        setSessions(updatedSessions);
         setInput("");
         setIsLoading(true);
 
+        if (!user) saveLocalSessions(updatedSessions);
+
         try {
+            // 1. If remote, insert chat if it doesn't exist (handled by createNewChat logic or here)
+            const chatId = activeSessionId;
+            if (user) {
+                const { data: currentChat } = await supabase.from("chats").select("id").eq("id", chatId).single();
+                if (!currentChat) {
+                    await supabase.from("chats").insert({
+                        id: chatId,
+                        user_id: user.id,
+                        title: input.slice(0, 30)
+                    });
+                }
+                await supabase.from("messages").insert({
+                    chat_id: chatId,
+                    user_id: user.id,
+                    role: "user",
+                    content: input
+                });
+            }
+
+            // 2. Call API
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     messages: [
                         { role: "system", content: preferences.systemPrompt },
-                        ...newMessages.slice(-preferences.maxHistory),
+                        ...updatedMessages.slice(-preferences.maxHistory),
                     ],
                 }),
             });
 
-            if (!response.ok) {
-                throw new Error("Failed to fetch response");
-            }
-
             if (!response.body) return;
-
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let assistantContent = "";
 
-            // Add placeholder assistant message
-            setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
+                assistantContent += decoder.decode(value);
 
-                const chunk = decoder.decode(value, { stream: true });
-                assistantContent += chunk;
-
-                setMessages((prev) => [
-                    ...prev.slice(0, -1),
-                    { role: "assistant", content: assistantContent },
-                ]);
+                setSessions(prev => prev.map(s =>
+                    s.id === activeSessionId
+                        ? { ...s, messages: [...updatedMessages, { role: "assistant", content: assistantContent }] }
+                        : s
+                ));
             }
-        } catch (error) {
-            console.error("Chat Error:", error);
-            setMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: "Sorry, I encountered an error. Please check your API key and try again." },
-            ]);
+
+            // 3. If remote, save assistant message
+            if (user) {
+                await supabase.from("messages").insert({
+                    chat_id: chatId,
+                    user_id: user.id,
+                    role: "assistant",
+                    content: assistantContent
+                });
+            } else {
+                saveLocalSessions(
+                    sessions.map(s => s.id === activeSessionId ? { ...s, messages: [...updatedMessages, { role: "assistant", content: assistantContent }] } : s)
+                );
+            }
+        } catch (err) {
+            console.error(err);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const clearChat = () => {
-        setMessages([]);
-        localStorage.removeItem("chat-history");
-    };
-
     return (
-        <div className="flex flex-col h-[80vh] w-full max-w-4xl mx-auto bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden backdrop-blur-xl bg-opacity-80 dark:bg-opacity-80 transition-all duration-300">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-900 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-md">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-600 rounded-lg">
-                        <Bot className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
-                            Groq Assistant
-                            <span className="text-[10px] px-2 py-0.5 bg-green-500/10 text-green-500 rounded-full border border-green-500/20">Llama 3.3-70b</span>
-                        </h2>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">Powered by Groq LPUs</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
+        <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans">
+            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+
+            {/* Sidebar */}
+            <motion.aside
+                initial={false}
+                animate={{ width: isSidebarOpen ? 300 : 0, opacity: isSidebarOpen ? 1 : 0 }}
+                className="relative flex flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 overflow-hidden"
+            >
+                <div className="p-4 flex flex-col h-full">
                     <button
-                        onClick={clearChat}
-                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full transition-colors text-zinc-500 hover:text-red-500"
-                        title="Clear Chat"
+                        onClick={createNewChat}
+                        className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
                     >
-                        <Trash2 className="w-5 h-5" />
+                        <Plus className="w-5 h-5" />
+                        New Chat
                     </button>
-                    <button
-                        onClick={() => setShowSettings(!showSettings)}
-                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-full transition-colors text-zinc-500 hover:text-indigo-500"
-                        title="Settings"
-                    >
-                        <Settings className={`w-5 h-5 ${showSettings ? 'rotate-90' : ''} transition-transform duration-300`} />
-                    </button>
-                </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                {showSettings && (
-                    <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in slide-in-from-top-4 duration-300">
-                        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-indigo-500" />
-                            Chat Preferences
-                        </h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs text-zinc-500 mb-1">System Prompt</label>
-                                <textarea
-                                    value={preferences.systemPrompt}
-                                    onChange={(e) => setPreferences({ ...preferences, systemPrompt: e.target.value })}
-                                    className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                    rows={3}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-zinc-500 mb-1">Context Window (Messages)</label>
-                                <input
-                                    type="number"
-                                    value={preferences.maxHistory}
-                                    onChange={(e) => setPreferences({ ...preferences, maxHistory: parseInt(e.target.value) })}
-                                    className="w-24 px-3 py-2 text-sm bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {messages.length === 0 && !isLoading && (
-                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in duration-500 pt-12">
-                        <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center">
-                            <Bot className="w-8 h-8 text-indigo-500" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold dark:text-zinc-100">How can I help you today?</h3>
-                            <p className="text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
-                                Ask me anything! I&apos;m powered by Llama 3.3 70B and running at lightspeed on Groq.
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {messages.map((m, i) => (
-                    <div
-                        key={i}
-                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-in ${m.role === 'user' ? 'slide-in-from-right-4' : 'slide-in-from-left-4'} fade-in duration-300`}
-                    >
-                        <div className={`flex gap-3 max-w-[85%] ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${m.role === "user" ? "bg-zinc-100 dark:bg-zinc-800" : "bg-indigo-600"}`}>
-                                {m.role === "user" ? <User className="w-4 h-4 text-zinc-600 dark:text-zinc-300" /> : <Bot className="w-4 h-4 text-white" />}
-                            </div>
-                            <div
-                                className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${m.role === "user"
-                                    ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-tr-none"
-                                    : "bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-tl-none border border-zinc-200 dark:border-zinc-800 shadow-sm"
-                                    }`}
+                    <div className="flex-1 mt-6 overflow-y-auto scrollbar-hide space-y-2">
+                        <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest px-2 mb-2">History</h3>
+                        {sessions.map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => setActiveSessionId(s.id)}
+                                className={cn(
+                                    "w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors group",
+                                    activeSessionId === s.id ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                                )}
                             >
-                                {m.content}
-                            </div>
-                        </div>
+                                <History className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate text-sm font-medium">{s.title}</span>
+                                <ChevronRight className={cn("w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity", activeSessionId === s.id && "opacity-100")} />
+                            </button>
+                        ))}
                     </div>
-                ))}
-                {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-                    <div className="flex justify-start animate-in fade-in duration-300">
-                        <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                                <Loader2 className="w-4 h-4 text-white animate-spin" />
-                            </div>
-                            <div className="px-4 py-3 bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-2xl rounded-tl-none border border-zinc-200 dark:border-zinc-800">
-                                <span className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"></span>
-                                    <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-            </div>
 
-            {/* Input Area */}
-            <div className="p-6 border-t border-zinc-100 dark:border-zinc-900 bg-white dark:bg-zinc-950">
-                <form onSubmit={handleSend} className="relative group">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        disabled={isLoading}
-                        placeholder="Type your message..."
-                        className="w-full px-5 py-4 bg-zinc-100 dark:bg-zinc-900 border border-transparent focus:border-indigo-500 dark:focus:border-indigo-500 rounded-xl outline-none transition-all pr-12 text-zinc-800 dark:text-zinc-200 shadow-inner group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800/50"
-                    />
-                    <button
-                        type="submit"
-                        disabled={!input.trim() || isLoading}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-400 dark:disabled:bg-zinc-800 text-white rounded-lg transition-all shadow-lg active:scale-95"
-                    >
-                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                    </button>
-                </form>
-                <p className="text-[10px] text-center mt-3 text-zinc-400 uppercase tracking-widest font-medium">
-                    Llama 3.3 70B • Real-time Streaming • Local History
-                </p>
-            </div>
-        </div>
+                    <div className="pt-4 mt-auto border-t border-zinc-100 dark:border-zinc-800">
+                        {user ? (
+                            <div className="flex items-center justify-between p-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-xs font-bold text-indigo-600">
+                                        {user.email?.[0].toUpperCase()}
+                                    </div>
+                                    <span className="text-xs truncate max-w-[120px] dark:text-zinc-400">{user.email}</span>
+                                </div>
+                                <button onClick={() => supabase.auth.signOut()} className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded-lg transition-colors">
+                                    <LogOut className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsAuthModalOpen(true)}
+                                className="w-full py-2 px-4 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all"
+                            >
+                                <LogIn className="w-4 h-4" />
+                                Sign In to Sync
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </motion.aside>
+            <main className="flex-1 flex flex-col relative">
+
+                {/* Settings Overlay */}
+                <AnimatePresence>
+                    {showSettings && (
+                        <>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setShowSettings(false)}
+                                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, x: 300 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 300 }}
+                                className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-zinc-900 shadow-2xl z-50 p-6 border-l border-zinc-200 dark:border-zinc-800"
+                            >
+                                <div className="flex items-center justify-between mb-8">
+                                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Settings</h2>
+                                    <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+                                        <X className="w-5 h-5 text-zinc-500" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold text-zinc-500 uppercase tracking-wider">System Prompt</label>
+                                        <textarea
+                                            value={preferences.systemPrompt}
+                                            onChange={(e) => updatePreference("systemPrompt", e.target.value)}
+                                            className="w-full h-32 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-indigo-500 transition-all dark:text-zinc-300"
+                                            placeholder="Customize how the AI behaves..."
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold text-zinc-500 uppercase tracking-wider">Context Memory ({preferences.maxHistory} msgs)</label>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="50"
+                                            value={preferences.maxHistory}
+                                            onChange={(e) => updatePreference("maxHistory", parseInt(e.target.value))}
+                                            className="w-full accent-indigo-600"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-auto pt-8">
+                                    <div className="bg-indigo-50 dark:bg-indigo-500/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/20">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                                            <span className="text-xs font-bold text-indigo-600 uppercase">Cloud Sync</span>
+                                        </div>
+                                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                            {user
+                                                ? "Your preferences are securely synced to your account across all devices."
+                                                : "You are in Guest Mode. Sign in to save your custom prompts to the cloud."}
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </>
+                    )}
+                </AnimatePresence>
+
+                {/* Top Header */}
+                <header className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-xl z-20">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg transition-colors"
+                        >
+                            {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <Bot className="w-6 h-6 text-indigo-600" />
+                            <h1 className="font-bold text-zinc-900 dark:text-zinc-50">Groq Chat</h1>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {!user && (
+                            <span className="hidden sm:block text-[10px] px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-full border border-zinc-200 dark:border-zinc-700">
+                                GUEST MODE
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setShowSettings(!showSettings)}
+                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg transition-colors text-zinc-500"
+                        >
+                            <Settings className="w-5 h-5" />
+                        </button>
+                    </div>
+                </header>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-8 scrollbar-custom">
+                    <div className="max-w-4xl mx-auto space-y-8">
+                        {activeSession?.messages.length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center pt-20 text-center space-y-6">
+                                <motion.div
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center"
+                                >
+                                    <Bot className="w-10 h-10 text-indigo-600" />
+                                </motion.div>
+                                <div className="space-y-2">
+                                    <h2 className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">What&apos;s on your mind?</h2>
+                                    <p className="text-zinc-500 max-w-sm mx-auto">Ask anything to Llama 3.3. Your thoughts are safe with our hybrid persistence.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <AnimatePresence initial={false}>
+                            {activeSession?.messages.map((m, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={cn(
+                                        "flex w-full gap-4",
+                                        m.role === "user" ? "flex-row-reverse" : "flex-row"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm",
+                                        m.role === "user" ? "bg-zinc-200 dark:bg-zinc-800" : "bg-indigo-600"
+                                    )}>
+                                        {m.role === "user" ? <User className="w-5 h-5 text-zinc-600 dark:text-zinc-400" /> : <Bot className="w-5 h-5 text-white" />}
+                                    </div>
+                                    <div className={cn(
+                                        "max-w-[80%] px-5 py-3 rounded-3xl text-sm leading-relaxed",
+                                        m.role === "user"
+                                            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-tr-none"
+                                            : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-tl-none shadow-sm"
+                                    )}>
+                                        {m.content}
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                        {isLoading && (
+                            <div className="flex gap-4">
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center flex-shrink-0 animate-pulse">
+                                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                                </div>
+                                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-5 py-3 rounded-3xl rounded-tl-none flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+                </div>
+
+                {/* Input */}
+                <div className="p-6 bg-gradient-to-t from-zinc-50 dark:from-zinc-950 via-zinc-50 dark:via-zinc-950 to-transparent">
+                    <div className="max-w-4xl mx-auto">
+                        <form onSubmit={handleSend} className="relative group">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={isLoading || !activeSessionId}
+                                placeholder={activeSessionId ? "Send a message..." : "Create a new chat to begin..."}
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-6 py-4 pr-16 outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-lg text-zinc-800 dark:text-zinc-100"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isLoading || !activeSessionId}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white rounded-xl transition-all shadow-md active:scale-95"
+                            >
+                                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                            </button>
+                        </form>
+                        <p className="mt-3 text-[10px] text-center text-zinc-400 uppercase tracking-widest font-bold">
+                            Groq &bull; Llama 3.3 &bull; {user ? "Cloud Synced" : "Local Storage"}
+                        </p>
+                    </div>
+                </div>
+            </main>
+        </div >
     );
 }
