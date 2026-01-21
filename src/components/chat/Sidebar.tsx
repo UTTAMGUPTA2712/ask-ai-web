@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span>New Chat</span>
                 </motion.button>
 
-                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 space-y-8 pr-2">
+                <div className="flex-1 overflow-y-auto space-y-8 pr-2">
 
                     {/* My Custom GPTs */}
                     <div>

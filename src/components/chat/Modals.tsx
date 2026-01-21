@@ -95,7 +95,7 @@ export const GptModal: React.FC<GptModalProps> = ({ isOpen, onClose, activeGpt, 
                                         name="instructions"
                                         required
                                         defaultValue={activeGpt?.instructions}
-                                        className="w-full h-32 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-brand-primary transition-all resize-none dark:text-zinc-100 font-mono text-sm leading-relaxed"
+                                        className="w-full h-64 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-brand-primary transition-all resize-none dark:text-zinc-100 font-mono text-sm leading-relaxed"
                                         placeholder="You are an expert React developer..."
                                     />
                                 </div>

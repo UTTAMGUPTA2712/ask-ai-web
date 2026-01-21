@@ -33,27 +33,48 @@ export function useCustomGpts(user: CustomUser | null) {
     const saveGpt = async (formData: FormData) => {
         if (!user) return;
         setIsGptSaving(true);
+        console.log("Attempting to save GPT persona...");
+
         try {
-            const name = formData.get("name") as string;
-            const instructions = formData.get("instructions") as string;
-            const description = formData.get("description") as string;
-            const user_instruction = formData.get("user_instruction") as string;
+            const name = (formData.get("name") as string).trim();
+            const instructions = (formData.get("instructions") as string)
+                .replace(/\r\n/g, "\n")
+                .replace(/\n{3,}/g, "\n\n") // Collapse 3+ newlines into 2
+                .replace(/[ \t]+/g, " ")    // Collapse multiple spaces/tabs
+                .trim();
+            const description = (formData.get("description") as string).trim();
+            const user_instruction = (formData.get("user_instruction") as string)?.replace(/\r\n/g, "\n").trim();
             const is_public = formData.get("is_public") === "on";
+
+            console.log("Normalized Payload size:", {
+                name: name.length,
+                instructions: instructions.length,
+                description: description.length,
+                user_instruction: user_instruction?.length || 0
+            });
 
             const savePromise = editingGpt
                 ? supabase.from("custom_gpts").update({ name, instructions, description, user_instruction, is_public }).eq("id", editingGpt.id)
                 : supabase.from("custom_gpts").insert({ user_id: user.id, name, instructions, description, user_instruction, is_public });
 
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database operation timed out.")), 10000));
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Database operation timed out after 10 seconds. This usually happens if the network is very slow or the payload is being blocked.")), 10000)
+            );
+
             const result: any = await Promise.race([savePromise, timeoutPromise]);
 
-            if (result.error) throw new Error(result.error.message);
+            if (result.error) {
+                console.error("Supabase Error:", result.error);
+                throw result.error;
+            }
 
+            console.log("GPT saved successfully!");
             await loadCustomGpts(user.id);
             setIsGptModalOpen(false);
             setEditingGpt(null);
-        } catch (err) {
-            console.error("Error saving GPT:", err);
+        } catch (err: any) {
+            console.error("Full Error Object:", err);
+            alert(`Save Failed: ${err.message || 'Unknown error'}. \n\nEnsure you have run the required SQL scripts for the 'user_instruction' column!`);
             throw err;
         } finally {
             setIsGptSaving(false);

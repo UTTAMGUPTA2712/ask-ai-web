@@ -77,7 +77,7 @@ export const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
                         </div>
 
                         {/* Marketplace Grid */}
-                        <div className="p-6 max-h-[60vh] overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+                        <div className="p-6 max-h-[60vh] overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {filteredGpts.map(gpt => (
                                 <motion.div
                                     key={gpt.id}

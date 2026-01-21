@@ -104,7 +104,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                             <div className={cn(
                                 "max-w-[85%] px-6 py-4 rounded-2xl text-[15px] leading-relaxed shadow-sm",
                                 m.role === "user"
-                                    ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-tr-sm"
+                                    ? "bg-brand-primary text-white rounded-tr-sm"
                                     : "bg-white dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-700/50 text-zinc-800 dark:text-zinc-100 rounded-tl-sm backdrop-blur-sm"
                             )}>
                                 <div className="prose dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-zinc-900 dark:prose-pre:bg-black/50 prose-pre:border prose-pre:border-zinc-800 dark:prose-pre:border-zinc-800/50 prose-pre:rounded-xl max-w-none">
@@ -118,7 +118,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                                                         <div className="absolute top-0 left-0 right-0 px-4 py-1.5 bg-zinc-800/50 backdrop-blur border-b border-white/5 flex items-center justify-between">
                                                             <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-widest">{match[1]}</span>
                                                         </div>
-                                                        <pre className="!bg-zinc-900 !m-0 !p-4 !pt-10 scrollbar-thin scrollbar-thumb-zinc-700">
+                                                        <pre className="!bg-zinc-900 !m-0 !p-4 !pt-10">
                                                             <code className={className} {...props}>
                                                                 {children}
                                                             </code>

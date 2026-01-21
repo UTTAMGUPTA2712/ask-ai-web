@@ -22,20 +22,31 @@
 }
 
 /* Custom Scrollbar */
-.scrollbar-custom::-webkit-scrollbar {
-  width: 6px;
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-.scrollbar-custom::-webkit-scrollbar-track {
-  @apply bg-transparent;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.scrollbar-custom::-webkit-scrollbar-thumb {
-  @apply bg-zinc-200 dark:bg-zinc-800 rounded-full;
+::-webkit-scrollbar-thumb {
+  background: #12738733;
+  /* Brand Primary with 20% opacity */
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
-.scrollbar-custom::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-300 dark:bg-zinc-700;
+::-webkit-scrollbar-thumb:hover {
+  background: #12738766;
+  /* Brand Primary with 40% opacity */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #12738733 transparent;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
