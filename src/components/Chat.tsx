@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Menu, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useChatAuth } from "@/hooks/useChatAuth";
 import { useCustomGpts } from "@/hooks/useCustomGpts";
 import { useChatPreferences } from "@/hooks/useChatPreferences";
@@ -45,6 +46,9 @@ export default function Chat() {
 
     useEffect(() => {
         setIsMounted(true);
+        if (window.innerWidth < 768) {
+            setIsSidebarOpen(false);
+        }
     }, []);
 
     if (!isMounted) {
@@ -85,6 +89,14 @@ export default function Chat() {
                 onSelectGpt={createNewChat}
             />
 
+            {/* Mobile Backdrop */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             <Sidebar
                 isOpen={isSidebarOpen}
                 user={user}
@@ -100,6 +112,7 @@ export default function Chat() {
                 onOpenMarketplace={() => setIsMarketplaceOpen(true)}
                 onSignIn={() => setIsAuthModalOpen(true)}
                 onSignOut={handleSignOut}
+                onClose={() => setIsSidebarOpen(false)}
             />
 
             <main className="flex-1 flex flex-col relative bg-white dark:bg-zinc-950/50">

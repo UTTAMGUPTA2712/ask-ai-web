@@ -1,4 +1,4 @@
-import { Plus, History, ChevronRight, LogIn, LogOut, Settings, Trash2, Sparkles, Star, Search, LayoutGrid } from "lucide-react";
+import { Plus, History, ChevronRight, LogIn, LogOut, Settings, Trash2, Sparkles, Star, Search, LayoutGrid, X } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ interface SidebarProps {
     onOpenMarketplace: () => void;
     onSignIn: () => void;
     onSignOut: () => void;
+    onClose?: () => void;
 }
 
 const groupSessions = (sessions: ChatSession[]) => {
@@ -51,7 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onToggleStarGpt,
     onOpenMarketplace,
     onSignIn,
-    onSignOut
+    onSignOut,
+    onClose
 }) => {
     const grouped = groupSessions(sessions);
     const starredGpts = customGpts.filter(gpt => user?.starred_gpt_ids?.includes(gpt.id));
@@ -60,9 +62,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <motion.aside
             initial={false}
             animate={{ width: isOpen ? 320 : 0, opacity: isOpen ? 1 : 0 }}
-            className="flex flex-col h-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-zinc-200/50 dark:border-zinc-800/50 overflow-hidden shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] relative z-30"
+            className="flex flex-col h-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-zinc-200/50 dark:border-zinc-800/50 overflow-hidden shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] absolute md:relative z-40"
         >
             <div className="flex flex-col h-full p-4 w-[320px]"> {/* Fixed width inner container for content stability */}
+
+                {/* Mobile Header */}
+                <div className="flex md:hidden items-center justify-between mb-4 px-1">
+                    <span className="font-bold text-lg text-zinc-800 dark:text-zinc-100">Menu</span>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
 
                 {/* New Chat Button */}
                 <motion.button
