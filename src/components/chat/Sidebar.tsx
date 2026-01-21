@@ -186,27 +186,27 @@ const GptItem = ({ gpt, activeGptId, onNewChat, onOpenGptModal, onDeleteGpt, onT
             <span className="truncate text-sm font-medium">{gpt.name}</span>
             {gpt.is_public && <span className="ml-auto text-[8px] font-bold text-brand-primary border border-brand-primary/30 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">Public</span>}
         </button>
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white dark:bg-zinc-900 shadow-sm rounded-lg p-0.5 border border-zinc-100 dark:border-zinc-800">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all bg-white dark:bg-zinc-900 shadow-md rounded-xl p-1 border border-zinc-100 dark:border-zinc-800 z-10">
             <button
                 onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
-                className={cn("p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md transition-all", isStarred ? "text-amber-500" : "text-zinc-400")}
+                className={cn("p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-all", isStarred ? "text-amber-500" : "text-zinc-400")}
                 title={isStarred ? "Unstar" : "Star"}
             >
-                <Star className={cn("w-3.5 h-3.5", isStarred && "fill-current")} />
+                <Star className={cn("w-4 h-4", isStarred && "fill-current")} />
             </button>
             <button
                 onClick={(e) => { e.stopPropagation(); onOpenGptModal(gpt); }}
-                className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md transition-all text-zinc-500"
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-all text-zinc-500"
                 title="Edit GPT"
             >
-                <Settings className="w-3.5 h-3.5" />
+                <Settings className="w-4 h-4" />
             </button>
             <button
                 onClick={(e) => { e.stopPropagation(); onDeleteGpt(gpt.id); }}
-                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 rounded-md transition-all"
+                className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 rounded-lg transition-all"
                 title="Delete GPT"
             >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
             </button>
         </div>
     </div>
