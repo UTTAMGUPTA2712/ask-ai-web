@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Menu, Settings, Bot } from "lucide-react";
+import Image from "next/image";
+import { Menu, Settings } from "lucide-react";
 import { useChatAuth } from "@/hooks/useChatAuth";
 import { useCustomGpts } from "@/hooks/useCustomGpts";
 import { useChatPreferences } from "@/hooks/useChatPreferences";
@@ -18,8 +19,8 @@ import { GptModal, SettingsModal } from "@/components/chat/Modals";
 const AuthModal = dynamic(() => import("./AuthModal"), { ssr: false });
 
 export default function Chat() {
-    const { user, handleSignOut, supabase } = useChatAuth();
-    const { customGpts, isGptModalOpen, setIsGptModalOpen, editingGpt, setEditingGpt, isGptSaving, saveGpt, deleteGpt, loadCustomGpts } = useCustomGpts(user);
+    const { user, handleSignOut } = useChatAuth();
+    const { customGpts, isGptModalOpen, setIsGptModalOpen, editingGpt, setEditingGpt, isGptSaving, saveGpt, deleteGpt } = useCustomGpts(user);
     const { preferences, updatePreference } = useChatPreferences(user);
 
     // Pass dependencies to session hook
@@ -107,7 +108,15 @@ export default function Chat() {
                                 </>
                             ) : (
                                 <div className="flex items-center gap-2">
-                                    <Bot className="w-5 h-5 text-indigo-600" />
+                                    <div className="relative w-6 h-6 flex items-center justify-center">
+                                        <Image
+                                            src="/favicon-32x32.png"
+                                            alt="Ask AI Logo"
+                                            width={24}
+                                            height={24}
+                                            className="object-contain"
+                                        />
+                                    </div>
                                     <span className="font-bold text-zinc-900 dark:text-white">Ask AI</span>
                                 </div>
                             )}

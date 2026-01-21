@@ -1,5 +1,5 @@
-import React from "react";
-import { Plus, History, ChevronRight, LogIn, LogOut, Settings, Trash2, Bot, Sparkles, X } from "lucide-react";
+import { Plus, History, ChevronRight, LogIn, LogOut, Settings, Trash2, Sparkles } from "lucide-react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ChatSession, CustomGpt, CustomUser } from "@/types/chat";
@@ -123,8 +123,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                 : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
                                         )}
                                     >
-                                        <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0">
-                                            <Bot className="w-4 h-4 text-zinc-500" />
+                                        <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 p-1.5">
+                                            <Image
+                                                src="/favicon-32x32.png"
+                                                alt="GPT Logo"
+                                                width={20}
+                                                height={20}
+                                                className="object-contain"
+                                            />
                                         </div>
                                         <span className="truncate text-sm font-medium">{gpt.name}</span>
                                     </button>

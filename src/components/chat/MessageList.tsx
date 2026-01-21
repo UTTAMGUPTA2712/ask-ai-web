@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
-import { Message, CustomGpt, ChatSession } from "@/types/chat";
-import { Bot, User, Loader2 } from "lucide-react";
+import { CustomGpt, ChatSession } from "@/types/chat";
+import Image from "next/image";
+import { User, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -35,8 +36,18 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                     className="relative"
                 >
                     <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full" />
-                    <div className="w-24 h-24 bg-gradient-to-tr from-indigo-100 to-white dark:from-zinc-800 dark:to-zinc-700 rounded-[2rem] flex items-center justify-center shadow-xl relative z-10 border border-white/50 dark:border-white/10">
-                        {customGpt ? <SparklesIcon className="w-12 h-12 text-indigo-500" /> : <Bot className="w-12 h-12 text-indigo-500" />}
+                    <div className="w-24 h-24 bg-gradient-to-tr from-indigo-100 to-white dark:from-zinc-800 dark:to-zinc-700 rounded-[2rem] flex items-center justify-center shadow-xl relative z-10 border border-white/50 dark:border-white/10 p-4">
+                        {customGpt ? (
+                            <SparklesIcon className="w-12 h-12 text-indigo-500" />
+                        ) : (
+                            <Image
+                                src="/favicon-512x512.png"
+                                alt="Ask AI Logo"
+                                width={64}
+                                height={64}
+                                className="object-contain"
+                            />
+                        )}
                     </div>
                 </motion.div>
                 <div className="space-y-3 z-10">
@@ -77,7 +88,15 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                                 {m.role === "user" ? (
                                     <User className="w-5 h-5 text-zinc-600 dark:text-zinc-300" />
                                 ) : (
-                                    <Bot className="w-5 h-5 text-white" />
+                                    <div className="relative w-6 h-6 flex items-center justify-center">
+                                        <Image
+                                            src="/favicon-32x32.png"
+                                            alt="AI"
+                                            width={24}
+                                            height={24}
+                                            className="object-contain brightness-0 invert"
+                                        />
+                                    </div>
                                 )}
                             </div>
 
@@ -92,7 +111,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                            code({ node, className, children, ...props }: any) {
+                                            code({ className, children, ...props }) {
                                                 const match = /language-(\w+)/.exec(className || '');
                                                 return match ? (
                                                     <div className="relative group/code my-4 rounded-xl overflow-hidden">
@@ -146,7 +165,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
 };
 
 // Helper for the empty state icon
-function SparklesIcon(props: any) {
+function SparklesIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
         <svg
             {...props}
