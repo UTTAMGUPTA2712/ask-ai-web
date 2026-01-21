@@ -19,6 +19,7 @@ export interface CustomGpt {
     name: string;
     description: string;
     instructions: string;
+    user_instruction?: string;
     is_public: boolean;
     user_id: string;
     icon_url?: string;
@@ -27,6 +28,7 @@ export interface CustomGpt {
 export interface CustomUser {
     id: string;
     email?: string;
+    starred_gpt_ids?: string[];
 }
 
 export interface ChatPreferences {

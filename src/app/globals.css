@@ -4,6 +4,15 @@
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-brand-primary: #127387;
+  /* Lighter Teal */
+  --color-brand-primary-hover: #0f6271;
+  --color-brand-secondary: #2299b0;
+  /* Light Cyan/Teal */
+  --color-brand-secondary-hover: #1e869a;
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @layer base {

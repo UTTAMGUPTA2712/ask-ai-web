@@ -37,11 +37,12 @@ export function useCustomGpts(user: CustomUser | null) {
             const name = formData.get("name") as string;
             const instructions = formData.get("instructions") as string;
             const description = formData.get("description") as string;
+            const user_instruction = formData.get("user_instruction") as string;
             const is_public = formData.get("is_public") === "on";
 
             const savePromise = editingGpt
-                ? supabase.from("custom_gpts").update({ name, instructions, description, is_public }).eq("id", editingGpt.id)
-                : supabase.from("custom_gpts").insert({ user_id: user.id, name, instructions, description, is_public });
+                ? supabase.from("custom_gpts").update({ name, instructions, description, user_instruction, is_public }).eq("id", editingGpt.id)
+                : supabase.from("custom_gpts").insert({ user_id: user.id, name, instructions, description, user_instruction, is_public });
 
             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Database operation timed out.")), 10000));
             const result: any = await Promise.race([savePromise, timeoutPromise]);
@@ -56,6 +57,30 @@ export function useCustomGpts(user: CustomUser | null) {
             throw err;
         } finally {
             setIsGptSaving(false);
+        }
+    };
+
+    const toggleStarGpt = async (gptId: string, isCurrentlyStarred: boolean) => {
+        if (!user) return;
+        try {
+            const currentStars = user.starred_gpt_ids || [];
+            const newStars = isCurrentlyStarred
+                ? currentStars.filter(id => id !== gptId)
+                : [...currentStars, gptId];
+
+            const { error } = await supabase
+                .from("profiles")
+                .update({ starred_gpt_ids: newStars })
+                .eq("id", user.id);
+
+            if (error) throw error;
+
+            // Note: useChatAuth should ideally handle the update via onAuthStateChange 
+            // but we might need to manually trigger a reload or update local state if auth listener isn't enough.
+            // For now, we rely on the implementation plan's structure.
+            window.location.reload(); // Quick fix to refresh user state from DB
+        } catch (err) {
+            console.error("Error toggling star:", err);
         }
     };
 
@@ -76,6 +101,7 @@ export function useCustomGpts(user: CustomUser | null) {
         isGptSaving,
         saveGpt,
         deleteGpt,
+        toggleStarGpt,
         loadCustomGpts
     };
 }

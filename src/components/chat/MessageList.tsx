@@ -24,9 +24,9 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
         scrollToBottom();
     }, [session?.messages, isLoading]);
 
-    if (!session) return null;
+    const showEmptyState = !session || (session && session.messages.length === 0);
 
-    if (session.messages.length === 0) {
+    if (showEmptyState) {
         return (
             <div className="h-full flex flex-col items-center justify-center pt-20 text-center space-y-8 px-6">
                 <motion.div
@@ -35,13 +35,13 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                     transition={{ type: "spring", stiffness: 200, damping: 20 }}
                     className="relative"
                 >
-                    <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full" />
-                    <div className="w-24 h-24 bg-gradient-to-tr from-indigo-100 to-white dark:from-zinc-800 dark:to-zinc-700 rounded-[2rem] flex items-center justify-center shadow-xl relative z-10 border border-white/50 dark:border-white/10 p-4">
+                    <div className="absolute inset-0 bg-[#127387]/20 blur-3xl rounded-full" />
+                    <div className="w-24 h-24 bg-gradient-to-tr from-[#127387]/10 to-[#2299b0]/10 dark:from-[#127387]/20 dark:to-[#2299b0]/20 rounded-[2rem] flex items-center justify-center shadow-xl relative z-10 border border-white/50 dark:border-white/10 p-4 animate-pulse-slow">
                         {customGpt ? (
-                            <SparklesIcon className="w-12 h-12 text-indigo-500" />
+                            <SparklesIcon className="w-12 h-12 text-brand-primary" />
                         ) : (
                             <Image
-                                src="/favicon-512x512.png"
+                                src="/android-chrome-512x512.png"
                                 alt="Ask AI Logo"
                                 width={64}
                                 height={64}
@@ -56,7 +56,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                     </h2>
                     <p className="text-zinc-500 max-w-md mx-auto text-lg font-medium leading-relaxed">
                         {customGpt
-                            ? customGpt.description || "I'm ready to assist you with your tasks."
+                            ? customGpt.user_instruction || customGpt.description || "I'm ready to assist you with your tasks."
                             : "Ask anything. I'm capable of writing code, solving problems, and creative writing."}
                     </p>
                 </div>
@@ -83,7 +83,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                                 "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform group-hover:scale-105",
                                 m.role === "user"
                                     ? "bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800"
-                                    : "bg-gradient-to-br from-indigo-600 to-violet-600"
+                                    : "bg-gradient-to-br from-brand-primary to-brand-secondary"
                             )}>
                                 {m.role === "user" ? (
                                     <User className="w-5 h-5 text-zinc-600 dark:text-zinc-300" />
@@ -105,7 +105,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                                 "max-w-[85%] px-6 py-4 rounded-2xl text-[15px] leading-relaxed shadow-sm",
                                 m.role === "user"
                                     ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-tr-sm"
-                                    : "bg-white dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60 text-zinc-800 dark:text-zinc-200 rounded-tl-sm backdrop-blur-sm"
+                                    : "bg-white dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-700/50 text-zinc-800 dark:text-zinc-100 rounded-tl-sm backdrop-blur-sm"
                             )}>
                                 <div className="prose dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-zinc-900 dark:prose-pre:bg-black/50 prose-pre:border prose-pre:border-zinc-800 dark:prose-pre:border-zinc-800/50 prose-pre:rounded-xl max-w-none">
                                     <ReactMarkdown
@@ -125,7 +125,7 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                                                         </pre>
                                                     </div>
                                                 ) : (
-                                                    <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-md font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold" {...props}>
+                                                    <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-md font-mono text-xs text-brand-primary dark:text-brand-secondary font-bold" {...props}>
                                                         {children}
                                                     </code>
                                                 )
@@ -147,13 +147,13 @@ export const MessageList: React.FC<MessageListProps> = ({ session, isLoading, cu
                         animate={{ opacity: 1 }}
                         className="flex gap-4"
                     >
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center flex-shrink-0 animate-pulse shadow-lg shadow-indigo-500/20">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center flex-shrink-0 animate-pulse shadow-lg shadow-brand-primary/20">
                             <Loader2 className="w-4 h-4 text-white animate-spin" />
                         </div>
                         <div className="px-5 py-3 rounded-2xl rounded-tl-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
+                            <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                            <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                            <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce" />
                         </div>
                     </motion.div>
                 )}

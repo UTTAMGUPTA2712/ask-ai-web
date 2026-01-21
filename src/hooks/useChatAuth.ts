@@ -13,8 +13,17 @@ export function useChatAuth() {
             const { data: { user: supabaseUser } } = await supabase.auth.getUser();
             const manualUserRaw = localStorage.getItem("manual-session");
             const manualUser = manualUserRaw ? JSON.parse(manualUserRaw) as CustomUser : null;
-            const currentUser = supabaseUser || manualUser;
-            setUser(currentUser as CustomUser | null);
+
+            let currentUser = (supabaseUser || manualUser) as CustomUser | null;
+
+            if (currentUser && !currentUser.starred_gpt_ids) {
+                const { data: profile } = await supabase.from("profiles").select("starred_gpt_ids").eq("id", currentUser.id).single();
+                if (profile) {
+                    currentUser = { ...currentUser, starred_gpt_ids: profile.starred_gpt_ids || [] };
+                }
+            }
+
+            setUser(currentUser);
             isInitialLoad = false;
         };
 
@@ -25,7 +34,8 @@ export function useChatAuth() {
             const supabaseUser = session?.user ?? null;
 
             if (supabaseUser) {
-                setUser(supabaseUser as CustomUser);
+                const { data: profile } = await supabase.from("profiles").select("starred_gpt_ids").eq("id", supabaseUser.id).single();
+                setUser({ ...supabaseUser, starred_gpt_ids: profile?.starred_gpt_ids || [] } as CustomUser);
             } else {
                 const manualUserRaw = localStorage.getItem("manual-session");
                 if (!manualUserRaw) {

@@ -12,6 +12,7 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { GptModal, SettingsModal } from "@/components/chat/Modals";
+import { MarketplaceModal } from "@/components/chat/MarketplaceModal";
 
 // We keep AuthModal where it was or move it if we want strict separation, 
 // for now deriving it from the original location to avoid breaking its internal deps if any.
@@ -20,7 +21,7 @@ const AuthModal = dynamic(() => import("./AuthModal"), { ssr: false });
 
 export default function Chat() {
     const { user, handleSignOut } = useChatAuth();
-    const { customGpts, isGptModalOpen, setIsGptModalOpen, editingGpt, setEditingGpt, isGptSaving, saveGpt, deleteGpt } = useCustomGpts(user);
+    const { customGpts, isGptModalOpen, setIsGptModalOpen, editingGpt, setEditingGpt, isGptSaving, saveGpt, deleteGpt, toggleStarGpt } = useCustomGpts(user);
     const { preferences, updatePreference } = useChatPreferences(user);
 
     // Pass dependencies to session hook
@@ -39,6 +40,7 @@ export default function Chat() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
@@ -53,7 +55,7 @@ export default function Chat() {
     const activeGpt = activeSession?.gpt_id ? customGpts.find(g => g.id === activeSession.gpt_id) : undefined;
 
     return (
-        <div className="flex h-screen w-full bg-zinc-50 dark:bg-black overflow-hidden font-sans text-zinc-900 dark:text-zinc-100 selection:bg-indigo-500/30">
+        <div className="flex h-screen w-full bg-zinc-50 dark:bg-black overflow-hidden font-sans text-zinc-900 dark:text-zinc-100 selection:bg-brand-primary/30">
             <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
             <GptModal
@@ -74,6 +76,15 @@ export default function Chat() {
                 user={user}
             />
 
+            <MarketplaceModal
+                isOpen={isMarketplaceOpen}
+                onClose={() => setIsMarketplaceOpen(false)}
+                publicGpts={customGpts.filter(g => g.is_public)}
+                user={user}
+                onToggleStar={toggleStarGpt}
+                onSelectGpt={createNewChat}
+            />
+
             <Sidebar
                 isOpen={isSidebarOpen}
                 user={user}
@@ -85,6 +96,8 @@ export default function Chat() {
                 onSelectSession={setActiveSessionId}
                 onOpenGptModal={(gpt) => { setEditingGpt(gpt || null); setIsGptModalOpen(true); }}
                 onDeleteGpt={deleteGpt}
+                onToggleStarGpt={toggleStarGpt}
+                onOpenMarketplace={() => setIsMarketplaceOpen(true)}
                 onSignIn={() => setIsAuthModalOpen(true)}
                 onSignOut={handleSignOut}
             />
@@ -103,8 +116,8 @@ export default function Chat() {
                             {/* Dynamic Header Title based on Context */}
                             {activeGpt ? (
                                 <>
-                                    <span className="text-zinc-300">/</span>
-                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">{activeGpt.name}</span>
+                                    <span className="text-zinc-400 dark:text-zinc-500">/</span>
+                                    <span className="font-bold text-brand-primary dark:text-brand-secondary">{activeGpt.name}</span>
                                 </>
                             ) : (
                                 <div className="flex items-center gap-2">

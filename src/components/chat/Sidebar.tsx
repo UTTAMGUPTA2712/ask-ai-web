@@ -1,4 +1,4 @@
-import { Plus, History, ChevronRight, LogIn, LogOut, Settings, Trash2, Sparkles } from "lucide-react";
+import { Plus, History, ChevronRight, LogIn, LogOut, Settings, Trash2, Sparkles, Star, Search, LayoutGrid } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -15,9 +15,27 @@ interface SidebarProps {
     onSelectSession: (id: string) => void;
     onOpenGptModal: (gpt?: CustomGpt) => void;
     onDeleteGpt: (id: string) => void;
+    onToggleStarGpt: (id: string, isStarred: boolean) => void;
+    onOpenMarketplace: () => void;
     onSignIn: () => void;
     onSignOut: () => void;
 }
+
+const groupSessions = (sessions: ChatSession[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const last7Days = new Date(today);
+    last7Days.setDate(last7Days.getDate() - 7);
+
+    return {
+        today: sessions.filter(s => new Date(s.created_at) >= today),
+        yesterday: sessions.filter(s => new Date(s.created_at) >= yesterday && new Date(s.created_at) < today),
+        previous: sessions.filter(s => new Date(s.created_at) >= last7Days && new Date(s.created_at) < yesterday),
+        older: sessions.filter(s => new Date(s.created_at) < last7Days)
+    };
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({
     isOpen,
@@ -30,9 +48,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onSelectSession,
     onOpenGptModal,
     onDeleteGpt,
+    onToggleStarGpt,
+    onOpenMarketplace,
     onSignIn,
     onSignOut
 }) => {
+    const grouped = groupSessions(sessions);
+    const starredGpts = customGpts.filter(gpt => user?.starred_gpt_ids?.includes(gpt.id));
+    const otherGpts = customGpts.filter(gpt => !user?.starred_gpt_ids?.includes(gpt.id) && gpt.user_id === user?.id);
     return (
         <motion.aside
             initial={false}
@@ -46,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => onNewChat()}
-                    className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 transition-all mb-8"
+                    className="w-full py-3.5 px-4 bg-[#127387] hover:bg-[#0f6271] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#127387]/20 transition-all mb-8"
                 >
                     <Plus className="w-5 h-5" />
                     <span>New Chat</span>
@@ -56,110 +79,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     {/* My Custom GPTs */}
                     <div>
-                        <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 mb-3">My Personalities</h3>
+                        <h3 className="text-[10px] font-black text-zinc-500 dark:text-zinc-300 uppercase tracking-widest px-2 mb-3">My Personalities</h3>
                         <motion.button
                             whileHover={{ x: 4 }}
-                            onClick={() => onOpenGptModal()}
-                            className="w-full text-left p-2.5 rounded-lg flex items-center gap-3 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 text-indigo-600 dark:text-indigo-400 transition-all group mb-2"
+                            onClick={onOpenMarketplace}
+                            className="w-full text-left p-2.5 rounded-lg flex items-center gap-3 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 text-brand-primary dark:text-brand-primary transition-all group mb-2"
                         >
-                            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
-                                <Plus className="w-4 h-4" />
+                            <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                                <Search className="w-4 h-4" />
                             </div>
-                            <span className="text-sm font-bold">Create Persona</span>
+                            <span className="text-sm font-bold">Discover GPTs</span>
                         </motion.button>
 
-                        <div className="space-y-1">
-                            {customGpts.filter(g => g.user_id === user?.id).map(gpt => (
-                                <div key={gpt.id} className="group relative">
-                                    <button
-                                        onClick={() => onNewChat(gpt.id)}
-                                        className={cn(
-                                            "w-full text-left p-2 rounded-xl flex items-center gap-3 transition-all",
-                                            activeGptId === gpt.id
-                                                ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/20"
-                                                : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
-                                        )}
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-100 to-violet-100 dark:from-indigo-900/30 dark:to-violet-900/30 flex items-center justify-center flex-shrink-0">
-                                            <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                                        </div>
-                                        <span className="truncate text-sm font-medium">{gpt.name}</span>
-                                        {gpt.is_public && <span className="ml-auto text-[8px] font-bold text-indigo-500 border border-indigo-500/30 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">Public</span>}
-                                    </button>
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white dark:bg-zinc-900 shadow-sm rounded-lg p-0.5 border border-zinc-100 dark:border-zinc-800">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onOpenGptModal(gpt); }}
-                                            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md transition-all text-zinc-500"
-                                            title="Edit GPT"
-                                        >
-                                            <Settings className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onDeleteGpt(gpt.id); }}
-                                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 rounded-md transition-all"
-                                            title="Delete GPT"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
+                        {starredGpts.length > 0 && (
+                            <div className="mb-6">
+                                <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-2 mb-3 flex items-center gap-2">
+                                    <Star className="w-3 h-3 fill-current" />
+                                    Starred
+                                </h3>
+                                <div className="space-y-1">
+                                    {starredGpts.map(gpt => (
+                                        <GptItem key={gpt.id} gpt={gpt} activeGptId={activeGptId} onNewChat={onNewChat} onOpenGptModal={onOpenGptModal} onDeleteGpt={onDeleteGpt} onToggleStar={() => onToggleStarGpt(gpt.id, true)} isStarred={true} />
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        )}
+
+                        {user && (
+                            <>
+                                <h3 className="text-[10px] font-black text-zinc-500 dark:text-zinc-300 uppercase tracking-widest px-2 mb-3">My GPTs</h3>
+                                <motion.button
+                                    whileHover={{ x: 4 }}
+                                    onClick={() => onOpenGptModal()}
+                                    className="w-full text-left p-2.5 rounded-lg flex items-center gap-3 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 text-brand-primary dark:text-brand-primary transition-all group mb-2"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                                        <Plus className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-sm font-bold">Create Persona</span>
+                                </motion.button>
+
+                                <div className="space-y-1">
+                                    {otherGpts.map(gpt => (
+                                        <GptItem key={gpt.id} gpt={gpt} activeGptId={activeGptId} onNewChat={onNewChat} onOpenGptModal={onOpenGptModal} onDeleteGpt={onDeleteGpt} onToggleStar={() => onToggleStarGpt(gpt.id, false)} isStarred={false} />
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
 
-                    {/* Community GPTs */}
-                    {customGpts.filter(g => g.is_public && g.user_id !== user?.id).length > 0 && (
-                        <div>
-                            <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 mb-3">Community</h3>
-                            <div className="space-y-1">
-                                {customGpts.filter(g => g.is_public && g.user_id !== user?.id).map(gpt => (
-                                    <button
-                                        key={gpt.id}
-                                        onClick={() => onNewChat(gpt.id)}
-                                        className={cn(
-                                            "w-full text-left p-2 rounded-xl flex items-center gap-3 transition-all",
-                                            activeGptId === gpt.id
-                                                ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/20"
-                                                : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
-                                        )}
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0 p-1.5">
-                                            <Image
-                                                src="/favicon-32x32.png"
-                                                alt="GPT Logo"
-                                                width={20}
-                                                height={20}
-                                                className="object-contain"
-                                            />
-                                        </div>
-                                        <span className="truncate text-sm font-medium">{gpt.name}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Chat History */}
+                    {/* Chat History Grouped */}
                     <div>
-                        <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-2 mb-3">History</h3>
-                        <div className="space-y-1">
-                            {sessions.map(s => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => onSelectSession(s.id)}
-                                    className={cn(
-                                        "w-full text-left p-2 rounded-xl flex items-center gap-3 transition-all group",
-                                        activeSessionId === s.id
-                                            ? "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 font-medium"
-                                            : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400"
-                                    )}
-                                >
-                                    <History className={cn("w-4 h-4 flex-shrink-0", activeSessionId === s.id ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400")} />
-                                    <span className="truncate text-sm">{s.title}</span>
-                                    <ChevronRight className={cn("w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-all text-zinc-400", activeSessionId === s.id && "opacity-100")} />
-                                </button>
-                            ))}
-                        </div>
+                        <HistoryGroup title="Today" sessions={grouped.today} activeSessionId={activeSessionId} onSelectSession={onSelectSession} />
+                        <HistoryGroup title="Yesterday" sessions={grouped.yesterday} activeSessionId={activeSessionId} onSelectSession={onSelectSession} />
+                        <HistoryGroup title="Previous 7 Days" sessions={grouped.previous} activeSessionId={activeSessionId} onSelectSession={onSelectSession} />
+                        <HistoryGroup title="Older" sessions={grouped.older} activeSessionId={activeSessionId} onSelectSession={onSelectSession} />
                     </div>
                 </div>
 
@@ -168,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {user ? (
                         <div className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
                             <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white shadow-md">
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-primary to-brand-secondary flex items-center justify-center text-xs font-bold text-white shadow-md">
                                     {user.email?.[0].toUpperCase()}
                                 </div>
                                 <div className="flex flex-col">
@@ -192,5 +166,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             </div>
         </motion.aside>
+    );
+};
+
+const GptItem = ({ gpt, activeGptId, onNewChat, onOpenGptModal, onDeleteGpt, onToggleStar, isStarred }: any) => (
+    <div className="group relative">
+        <button
+            onClick={() => onNewChat(gpt.id)}
+            className={cn(
+                "w-full text-left p-2 rounded-xl flex items-center gap-3 transition-all",
+                activeGptId === gpt.id
+                    ? "bg-brand-primary/5 dark:bg-brand-primary/10 text-brand-primary dark:text-brand-secondary ring-1 ring-brand-primary/20"
+                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400"
+            )}
+        >
+            <div className="w-8 h-8 rounded-lg bg-[#127387]/10 flex items-center justify-center flex-shrink-0 p-1.5">
+                <Image src="/favicon-32x32.png" alt="GPT" width={20} height={20} className="object-contain" />
+            </div>
+            <span className="truncate text-sm font-medium">{gpt.name}</span>
+            {gpt.is_public && <span className="ml-auto text-[8px] font-bold text-brand-primary border border-brand-primary/30 px-1.5 py-0.5 rounded-md uppercase tracking-tighter">Public</span>}
+        </button>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white dark:bg-zinc-900 shadow-sm rounded-lg p-0.5 border border-zinc-100 dark:border-zinc-800">
+            <button
+                onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+                className={cn("p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md transition-all", isStarred ? "text-amber-500" : "text-zinc-400")}
+                title={isStarred ? "Unstar" : "Star"}
+            >
+                <Star className={cn("w-3.5 h-3.5", isStarred && "fill-current")} />
+            </button>
+            <button
+                onClick={(e) => { e.stopPropagation(); onOpenGptModal(gpt); }}
+                className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-md transition-all text-zinc-500"
+                title="Edit GPT"
+            >
+                <Settings className="w-3.5 h-3.5" />
+            </button>
+            <button
+                onClick={(e) => { e.stopPropagation(); onDeleteGpt(gpt.id); }}
+                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 rounded-md transition-all"
+                title="Delete GPT"
+            >
+                <Trash2 className="w-3.5 h-3.5" />
+            </button>
+        </div>
+    </div>
+);
+
+const HistoryGroup = ({ title, sessions, activeSessionId, onSelectSession }: any) => {
+    if (sessions.length === 0) return null;
+    return (
+        <div className="mb-6">
+            <h3 className="text-[10px] font-black text-zinc-500 dark:text-zinc-300 uppercase tracking-widest px-2 mb-3">{title}</h3>
+            <div className="space-y-1">
+                {sessions.map((s: any) => (
+                    <button
+                        key={s.id}
+                        onClick={() => onSelectSession(s.id)}
+                        className={cn(
+                            "w-full text-left p-2 rounded-xl flex items-center gap-3 transition-all group",
+                            activeSessionId === s.id
+                                ? "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-900 dark:text-white font-semibold"
+                                : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30 text-zinc-600 dark:text-zinc-300"
+                        )}
+                    >
+                        <History className={cn("w-4 h-4 flex-shrink-0", activeSessionId === s.id ? "text-brand-primary dark:text-brand-secondary" : "text-zinc-400")} />
+                        <span className="truncate text-sm">{s.title}</span>
+                        <ChevronRight className={cn("w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-all text-zinc-400", activeSessionId === s.id && "opacity-100")} />
+                    </button>
+                ))}
+            </div>
+        </div>
     );
 };

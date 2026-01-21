@@ -67,7 +67,7 @@ export const GptModal: React.FC<GptModalProps> = ({ isOpen, onClose, activeGpt, 
                                         name="name"
                                         required
                                         defaultValue={activeGpt?.name}
-                                        className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 transition-all dark:text-zinc-100 font-medium"
+                                        className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-brand-primary transition-all dark:text-zinc-100 font-medium"
                                         placeholder="e.g., Coding Mentor"
                                     />
                                 </div>
@@ -76,8 +76,17 @@ export const GptModal: React.FC<GptModalProps> = ({ isOpen, onClose, activeGpt, 
                                     <input
                                         name="description"
                                         defaultValue={activeGpt?.description}
-                                        className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 transition-all dark:text-zinc-100"
+                                        className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-brand-primary transition-all dark:text-zinc-100"
                                         placeholder="What does this persona do?"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest pl-1">User Greeting (Optional)</label>
+                                    <input
+                                        name="user_instruction"
+                                        defaultValue={activeGpt?.user_instruction}
+                                        className="w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-brand-primary transition-all dark:text-zinc-100"
+                                        placeholder="e.g., Hello! How can I help you today?"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
@@ -86,7 +95,7 @@ export const GptModal: React.FC<GptModalProps> = ({ isOpen, onClose, activeGpt, 
                                         name="instructions"
                                         required
                                         defaultValue={activeGpt?.instructions}
-                                        className="w-full h-32 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-indigo-500 transition-all resize-none dark:text-zinc-100 font-mono text-sm leading-relaxed"
+                                        className="w-full h-32 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-brand-primary transition-all resize-none dark:text-zinc-100 font-mono text-sm leading-relaxed"
                                         placeholder="You are an expert React developer..."
                                     />
                                 </div>
@@ -96,7 +105,7 @@ export const GptModal: React.FC<GptModalProps> = ({ isOpen, onClose, activeGpt, 
                                         name="is_public"
                                         id="is_public"
                                         defaultChecked={activeGpt?.is_public}
-                                        className="w-5 h-5 accent-indigo-600 rounded-lg cursor-pointer"
+                                        className="w-5 h-5 accent-brand-primary rounded-lg cursor-pointer"
                                     />
                                     <label htmlFor="is_public" className="text-sm font-bold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
                                         Make Public <span className="text-[10px] font-normal text-zinc-400 block tracking-normal uppercase">Share with the community</span>
@@ -104,7 +113,7 @@ export const GptModal: React.FC<GptModalProps> = ({ isOpen, onClose, activeGpt, 
                                 </div>
                                 <button
                                     disabled={isSaving}
-                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 mt-4"
+                                    className="w-full py-4 bg-brand-primary hover:bg-brand-primary-hover disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white rounded-2xl font-bold transition-all shadow-lg shadow-brand-primary/20 active:scale-95 flex items-center justify-center gap-2 mt-4"
                                 >
                                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (activeGpt ? "Save Changes" : "Create Persona")}
                                 </button>
@@ -159,7 +168,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, p
                                 <textarea
                                     value={preferences.systemPrompt}
                                     onChange={(e) => onUpdatePreference("systemPrompt", e.target.value)}
-                                    className="w-full h-40 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-sm font-mono leading-relaxed resize-none outline-none focus:ring-2 focus:ring-indigo-500 transition-all dark:text-zinc-300"
+                                    className="w-full h-40 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-sm font-mono leading-relaxed resize-none outline-none focus:ring-2 focus:ring-brand-primary transition-all dark:text-zinc-300"
                                     placeholder="Customize how the AI behaves..."
                                 />
                                 <p className="text-[10px] text-zinc-400">Overrides the default behavior when no specific persona is selected.</p>
@@ -168,7 +177,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, p
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Context Memory</label>
-                                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md">{preferences.maxHistory} msgs</span>
+                                    <span className="text-xs font-bold text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md">{preferences.maxHistory} msgs</span>
                                 </div>
                                 <input
                                     type="range"
@@ -176,16 +185,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, p
                                     max="50"
                                     value={preferences.maxHistory}
                                     onChange={(e) => onUpdatePreference("maxHistory", parseInt(e.target.value))}
-                                    className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-brand-primary"
                                 />
                             </div>
                         </div>
 
                         <div className="mt-auto pt-8">
-                            <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
+                            <div className="bg-gradient-to-br from-brand-primary/5 to-brand-secondary/5 dark:from-brand-primary/10 dark:to-brand-secondary/10 p-5 rounded-2xl border border-brand-primary/10 dark:border-brand-primary/20">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase">Cloud Sync Status</span>
+                                    <Sparkles className="w-4 h-4 text-brand-primary" />
+                                    <span className="text-xs font-bold text-brand-primary dark:text-brand-secondary uppercase">Cloud Sync Status</span>
                                 </div>
                                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                                     {user
