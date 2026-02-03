@@ -106,11 +106,13 @@ export function ChatInterface({ chatId = null, initialMessages = [], initialChat
           messages: newMessages,
         });
 
-        // Reload chats list in sidebar (only once for new chat)
-        const chatsHeaders = await getAuthHeaders();
-        const chatsResponse = await fetch('/api/chats', { headers: chatsHeaders });
-        const chatsData = await chatsResponse.json();
-        setChats(chatsData.chats || []); // Use setter from context
+        // Update chats list in sidebar immediately
+        setChats(prev => [{
+          id: data.chatId,
+          title: data.title,
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        }, ...prev]);
 
         // Navigate to the new chat
         router.push(`/chat/${data.chatId}`);

@@ -23,7 +23,11 @@ export async function GET(request) {
             guestIp,
         });
 
-        return NextResponse.json(result);
+        return NextResponse.json(result, {
+            headers: {
+                'Cache-Control': 'no-store, max-age=0',
+            },
+        });
     } catch (error) {
         console.error('Get chats error:', error);
         return NextResponse.json({ error: error.message }, { status: 400 });

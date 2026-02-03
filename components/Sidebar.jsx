@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, MessageSquare, LogOut, User, Sparkles, X, Library, ChevronDown, Sun } from 'lucide-react';
+import { Plus, MessageSquare, LogOut, User, Sparkles, X, Library, ChevronDown, Sun, Star, Pencil } from 'lucide-react';
 import { useAppStore } from '@/lib/context/StoreContext';
 import { supabase } from '@/lib/supabase/client';
 import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
@@ -45,6 +45,13 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
   const { toggleTheme } = useTheme();
   const [showGPTModal, setShowGPTModal] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [editingGPT, setEditingGPT] = useState(null);
+
+  const handleEditGPT = (e, gpt) => {
+    e.stopPropagation();
+    setEditingGPT(gpt);
+    setShowGPTModal(true);
+  };
 
   useEffect(() => {
     // Load data only if user is logged in and data hasn't been loaded yet
@@ -79,7 +86,10 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
   const loadChats = async () => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch('/api/chats', { headers });
+      const response = await fetch('/api/chats', {
+        headers,
+        cache: 'no-store'
+      });
       const data = await response.json();
       // Directly call setChats from context
       setChats(data.chats || []);
@@ -223,18 +233,35 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
                     Default
                   </Button>
                   {/* User's own GPTs */}
-                  {customGPTs.map((gpt) => (
-                    <Button
-                      key={gpt.id}
-                      variant={selectedGPT?.id === gpt.id ? "secondary" : "ghost"}
-                      className="w-full justify-start text-sm h-10"
-                      size="sm"
-                      onClick={() => handleGPTSelect(gpt)}
-                    >
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      {gpt.name}
-                    </Button>
-                  ))}
+                  {customGPTs.map((gpt) => {
+                    const isStarred = starredGPTs.some(s => s.id === gpt.id);
+                    return (
+                      <div key={gpt.id} className="group relative w-full">
+                        <Button
+                          variant={selectedGPT?.id === gpt.id ? "secondary" : "ghost"}
+                          className="w-full justify-start text-sm h-10 pr-8"
+                          size="sm"
+                          onClick={() => handleGPTSelect(gpt)}
+                          title={isStarred ? "Starred by you" : ""}
+                        >
+                          {isStarred ? (
+                            <Star className="mr-2 h-4 w-4 text-yellow-400 fill-yellow-400" />
+                          ) : (
+                            <Sparkles className="mr-2 h-4 w-4" />
+                          )}
+                          <span className="truncate">{gpt.name}</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => handleEditGPT(e, gpt)}
+                        >
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                   {/* Starred GPTs (excluding ones user already owns) */}
                   {starredGPTs
                     .filter(starred => !customGPTs.find(own => own.id === starred.id))
@@ -330,8 +357,12 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
 
         <CustomGPTModal
           open={showGPTModal}
-          onOpenChange={setShowGPTModal}
+          onOpenChange={(open) => {
+            setShowGPTModal(open);
+            if (!open) setEditingGPT(null);
+          }}
           onCreated={loadCustomGPTs}
+          initialData={editingGPT}
         />
 
         <CustomGPTGallery

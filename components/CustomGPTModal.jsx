@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,28 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
 import { toast } from 'sonner';
 
-export function CustomGPTModal({ open, onOpenChange, onCreated }) {
+export function CustomGPTModal({ open, onOpenChange, onCreated, initialData = null }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Initialize form when opening with data
+  useEffect(() => {
+    if (open && initialData) {
+      setName(initialData.name);
+      setDescription(initialData.description || '');
+      setSystemPrompt(initialData.system_prompt || '');
+      setIsPublic(initialData.is_public || false);
+    } else if (open && !initialData) {
+      // Reset for create mode
+      setName('');
+      setDescription('');
+      setSystemPrompt('');
+      setIsPublic(false);
+    }
+  }, [open, initialData]);
 
   const handleCreate = async () => {
     if (!name || !systemPrompt) {
@@ -26,8 +42,15 @@ export function CustomGPTModal({ open, onOpenChange, onCreated }) {
     try {
       setLoading(true);
       const headers = await getAuthHeaders();
-      const response = await fetch('/api/custom-gpts', {
-        method: 'POST',
+
+      const url = initialData
+        ? `/api/custom-gpts/${initialData.id}`
+        : '/api/custom-gpts';
+
+      const method = initialData ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers,
         body: JSON.stringify({
           name,
@@ -39,19 +62,24 @@ export function CustomGPTModal({ open, onOpenChange, onCreated }) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to create custom GPT');
+        throw new Error(error.error || `Failed to ${initialData ? 'update' : 'create'} custom GPT`);
       }
 
-      toast.success('Custom GPT created successfully!');
-      setName('');
-      setDescription('');
-      setSystemPrompt('');
-      setIsPublic(false);
+      toast.success(`Custom GPT ${initialData ? 'updated' : 'created'} successfully!`);
+
+      if (!initialData) {
+        // Only clear if creating, keep data if editing until closed
+        setName('');
+        setDescription('');
+        setSystemPrompt('');
+        setIsPublic(false);
+      }
+
       onOpenChange(false);
       if (onCreated) onCreated();
     } catch (error) {
-      toast.error(error.message || 'Failed to create custom GPT');
-      console.error('Create GPT error:', error);
+      toast.error(error.message || `Failed to ${initialData ? 'update' : 'create'} custom GPT`);
+      console.error('GPT error:', error);
     } finally {
       setLoading(false);
     }
@@ -61,9 +89,11 @@ export function CustomGPTModal({ open, onOpenChange, onCreated }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl sm:text-2xl">Create Custom GPT</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl">
+            {initialData ? 'Edit Custom GPT' : 'Create Custom GPT'}
+          </DialogTitle>
           <DialogDescription className="text-sm">
-            Create a custom AI personality with a specific system prompt
+            {initialData ? 'Update your' : 'Create a'} custom AI personality
           </DialogDescription>
         </DialogHeader>
 
@@ -127,7 +157,7 @@ export function CustomGPTModal({ open, onOpenChange, onCreated }) {
             onClick={handleCreate}
             disabled={loading}
           >
-            {loading ? 'Creating...' : 'Create Custom GPT'}
+            {loading ? (initialData ? 'Updating...' : 'Creating...') : (initialData ? 'Update Custom GPT' : 'Create Custom GPT')}
           </Button>
         </div>
       </DialogContent>
