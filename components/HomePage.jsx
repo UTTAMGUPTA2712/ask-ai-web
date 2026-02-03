@@ -1,27 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { useAppStore } from '@/lib/context/StoreContext';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatInterface } from '@/components/ChatInterface';
 import { AuthModal } from '@/components/AuthModal';
 import { Toaster } from 'sonner';
-import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
+import { useAppStore } from '@/lib/context/StoreContext'; // Updated import
 
-export default function ChatPage({ params }) {
+export default function HomePage() {
     const router = useRouter();
     const [showAuth, setShowAuth] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const { setUser, getChatCache, setChatCache } = useAppStore();
-    const chatId = params?.chatId;
-
-    // Get cached data
-    const cachedData = getChatCache(chatId);
-    const [chat, setChat] = useState(cachedData?.chat || null);
-    const [messages, setMessages] = useState(cachedData?.messages || []);
+    const { setUser } = useAppStore(); // Updated hook
 
     useEffect(() => {
         // Check current session
@@ -39,6 +31,7 @@ export default function ChatPage({ params }) {
             if (session?.user) {
                 setUser(session.user);
 
+                // Handle Google login - create user with default password if first time
                 if (event === 'SIGNED_IN' && session.user.app_metadata.provider === 'google') {
                     await handleGoogleUserCreation(session.user);
                 }
@@ -50,31 +43,16 @@ export default function ChatPage({ params }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    useEffect(() => {
-        // Load chat data - check cache first
-        if (chatId) {
-            const cached = getChatCache(chatId);
-
-            if (cached) {
-                // Use cached data
-                setChat(cached.chat);
-                setMessages(cached.messages);
-                setLoading(false);
-            } else {
-                // Fetch from API
-                loadChatData();
-            }
-        }
-    }, [chatId]);
-
     const handleGoogleUserCreation = async (user) => {
         try {
+            // Check if user exists in our database
             const { data: existingUser } = await supabase
                 .from('users')
                 .select('id')
                 .eq('id', user.id)
                 .single();
 
+            // If user doesn't exist, create with default password
             if (!existingUser) {
                 const session = await supabase.auth.getSession();
                 const token = session.data.session?.access_token;
@@ -90,7 +68,7 @@ export default function ChatPage({ params }) {
                             id: user.id,
                             email: user.email,
                             name: user.user_metadata.full_name || user.email.split('@')[0],
-                            password: 'Password123',
+                            password: 'Password123', // Default password for Google users
                         }),
                     });
                 }
@@ -100,52 +78,10 @@ export default function ChatPage({ params }) {
         }
     };
 
-    const loadChatData = async () => {
-        if (!chatId) return;
-
-        try {
-            setLoading(true);
-            const headers = await getAuthHeaders();
-
-            // Load chat and messages in parallel
-            const [chatRes, messagesRes] = await Promise.all([
-                fetch(`/api/chats/${chatId}`, { headers }),
-                fetch(`/api/chats/${chatId}/messages`, { headers })
-            ]);
-
-            if (chatRes.ok && messagesRes.ok) {
-                const chatData = await chatRes.json();
-                const messagesData = await messagesRes.json();
-
-                const chat = chatData.chat;
-                const messages = messagesData.messages || [];
-
-                // Update local state
-                setChat(chat);
-                setMessages(messages);
-
-                // Cache the data
-                setChatCache(chatId, { chat, messages });
-            } else {
-                console.error('Failed to load chat');
-                toast.error('Failed to load chat. Please try again.');
-            }
-        } catch (error) {
-            console.error('Failed to load chat:', error);
-            toast.error(`Error loading chat: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleNewChat = () => {
         router.push('/');
-        setSidebarOpen(false);
+        setSidebarOpen(false); // Close sidebar on mobile when starting new chat
     };
-
-    if (!chatId) {
-        return <div>Loading...</div>;
-    }
 
     return (
         <div className="flex h-screen overflow-hidden">
@@ -157,10 +93,9 @@ export default function ChatPage({ params }) {
             />
             <main className="flex-1 overflow-hidden">
                 <ChatInterface
-                    chatId={chatId}
-                    initialMessages={messages}
-                    initialChat={chat}
-                    loading={loading}
+                    chatId={null}
+                    initialMessages={[]}
+                    initialChat={null}
                     onMenuClick={() => setSidebarOpen(true)}
                 />
             </main>

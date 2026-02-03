@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase/client';
-import { useStore } from '@/lib/store/useStore';
+import { useAppStore } from '@/lib/context/StoreContext';
 import { Chrome } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,7 +16,7 @@ export function AuthModal({ open, onOpenChange }) {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const setUser = useStore((state) => state.setUser);
+  const { setUser } = useAppStore();
 
   const handleGoogleLogin = async () => {
     try {

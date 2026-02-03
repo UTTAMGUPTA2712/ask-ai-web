@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sparkles, Plus, Search, User, Star } from 'lucide-react';
-import { useStore } from '@/lib/store/useStore';
+import { useAppStore } from '@/lib/context/StoreContext';
 import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,12 @@ export function CustomGPTGallery({ open, onOpenChange, onCreateNew }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
-    const { user, publicGPTs, setPublicGPTs, starredGPTs, setStarredGPTs, setSelectedGPT, toggleStarGPT } = useStore();
+    const { user, publicGPTs, setPublicGPTs, starredGPTs, setStarredGPTs, setSelectedGPT } = useAppStore();
+
+    // Context doesn't offer a toggleStarGPT helper that handles state directly like zustand might have in a single call
+    // We will implement optimistic update locally or use the context setters.
+    // Looking at StoreContext, it doesn't seem to export toggleStarGPT.
+    // We'll need to implement the logic here using setPublicGPTs/setStarredGPTs.
 
     useEffect(() => {
         if (open) {
@@ -64,7 +69,17 @@ export function CustomGPTGallery({ open, onOpenChange, onCreateNew }) {
         const isStarred = gpt.is_starred;
 
         // Optimistic update
-        toggleStarGPT(gpt.id);
+        // Update publicGPTs
+        setPublicGPTs(publicGPTs.map(g =>
+            g.id === gpt.id ? { ...g, is_starred: !isStarred } : g
+        ));
+
+        // Update starredGPTs
+        if (!isStarred) {
+            setStarredGPTs([...starredGPTs, { ...gpt, is_starred: true }]);
+        } else {
+            setStarredGPTs(starredGPTs.filter(g => g.id !== gpt.id));
+        }
 
         try {
             const headers = await getAuthHeaders();
@@ -84,7 +99,18 @@ export function CustomGPTGallery({ open, onOpenChange, onCreateNew }) {
             }
         } catch (error) {
             // Revert optimistic update on error
-            toggleStarGPT(gpt.id);
+            setPublicGPTs(publicGPTs.map(g =>
+                g.id === gpt.id ? { ...g, is_starred: isStarred } : g
+            ));
+
+            // Revert starredGPTs
+            if (!isStarred) {
+                setStarredGPTs(starredGPTs.filter(g => g.id !== gpt.id));
+            } else {
+                // Trying to add it back might be tricky if we don't have the full object, 
+                // but gpt variable holds it.
+                setStarredGPTs([...starredGPTs, gpt]);
+            }
             toast.error('Failed to update star');
             console.error('Star toggle error:', error);
         }

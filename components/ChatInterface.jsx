@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Loader2, Menu } from 'lucide-react';
-import { useStore } from '@/lib/store/useStore';
+import { useAppStore } from '@/lib/context/StoreContext';
 import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
 import { ChatMessage } from './ChatMessage';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ export function ChatInterface({ chatId = null, initialMessages = [], initialChat
   const [messages, setMessages] = useState(initialMessages);
   const [chat, setChat] = useState(initialChat);
   const scrollRef = useRef(null);
-  const { selectedGPT, user, setChatCache, addMessageToCache, updateLastMessageInCache } = useStore();
+  const { selectedGPT, user, setChatCache, addMessageToCache, updateLastMessageInCache, setChats } = useAppStore();
 
   // Update messages when initialMessages changes (for route changes)
   useEffect(() => {
@@ -110,7 +110,7 @@ export function ChatInterface({ chatId = null, initialMessages = [], initialChat
         const chatsHeaders = await getAuthHeaders();
         const chatsResponse = await fetch('/api/chats', { headers: chatsHeaders });
         const chatsData = await chatsResponse.json();
-        useStore.getState().setChats(chatsData.chats || []); // Use setter to update flag
+        setChats(chatsData.chats || []); // Use setter from context
 
         // Navigate to the new chat
         router.push(`/chat/${data.chatId}`);
@@ -150,7 +150,7 @@ export function ChatInterface({ chatId = null, initialMessages = [], initialChat
       </div>
 
       {/* Messages Area */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      <ScrollArea className="flex-1" viewportRef={scrollRef}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4">

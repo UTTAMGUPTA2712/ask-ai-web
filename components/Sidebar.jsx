@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Plus, MessageSquare, LogOut, User, Sparkles, X, Library, ChevronDown, Sun } from 'lucide-react';
-import { useStore } from '@/lib/store/useStore';
+import { useAppStore } from '@/lib/context/StoreContext';
 import { supabase } from '@/lib/supabase/client';
 import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
 import { toast } from 'sonner';
@@ -38,7 +38,10 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
     chatsLoaded,
     customGPTsLoaded,
     starredGPTsLoaded,
-  } = useStore();
+    clearCache,
+    setChats,
+    setCustomGPTs
+  } = useAppStore();
   const { toggleTheme } = useTheme();
   const [showGPTModal, setShowGPTModal] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
@@ -78,9 +81,11 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
       const headers = await getAuthHeaders();
       const response = await fetch('/api/chats', { headers });
       const data = await response.json();
-      useStore.setState({ chats: data.chats || [] });
+      // Directly call setChats from context
+      setChats(data.chats || []);
     } catch (error) {
       console.error('Failed to load chats:', error);
+      toast.error('Failed to load chats');
     }
   };
 
@@ -89,7 +94,8 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
       const headers = await getAuthHeaders();
       const response = await fetch('/api/custom-gpts', { headers });
       const data = await response.json();
-      useStore.setState({ customGPTs: data.customGPTs || [] });
+      // Directly call setCustomGPTs from context
+      setCustomGPTs(data.customGPTs || []);
     } catch (error) {
       console.error('Failed to load custom GPTs:', error);
     }
@@ -100,7 +106,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
       const headers = await getAuthHeaders();
       const response = await fetch('/api/custom-gpts/starred', { headers });
       const data = await response.json();
-      setStarredGPTs(data.customGPTs || []);
+      setStarredGPTs(data.customGPTs || []); // This comes from useAppStore destructuring
     } catch (error) {
       console.error('Failed to load starred GPTs:', error);
     }
@@ -110,8 +116,14 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
     try {
       await supabase.auth.signOut();
       setUser(null);
-      useStore.setState({ chats: [], customGPTs: [] });
-      useStore.getState().clearCache(); // Clear chat cache
+      // useStore.setState({ chats: [], customGPTs: [] }) - Context doesn't have setState
+      // Instead call individual setters if needed, or clearCache handles flags
+      // But clearing state manually:
+      // In Context, we rely on clearCache
+      // useStore.getState().clearCache(); 
+      // Context exposes clearCache directly
+      clearCache(); // Assuming this is destructured from useAppStore
+
       router.push('/');
       toast.success('Logged out successfully');
     } catch (error) {
