@@ -147,7 +147,7 @@ export function ChatInterface({ chatId = null, initialMessages = [], initialChat
           <Menu className="h-5 w-5" />
         </Button>
         <h1 className="text-lg font-semibold">
-          {chat?.title || 'AI Chat'}
+          {chat?.title || 'Ask AI'}
         </h1>
       </div>
 
@@ -163,7 +163,7 @@ export function ChatInterface({ chatId = null, initialMessages = [], initialChat
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4 p-4 sm:p-8">
-              <h1 className="text-3xl sm:text-4xl font-bold">AI Chat</h1>
+              <h1 className="text-3xl sm:text-4xl font-bold">Ask AI</h1>
               <p className="text-muted-foreground text-sm sm:text-base">
                 {selectedGPT
                   ? `Chatting with ${selectedGPT.name}`

@@ -115,7 +115,7 @@ export function AuthModal({ open, onOpenChange }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl sm:text-2xl">Welcome to AI Chat</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl">Welcome to Ask AI</DialogTitle>
           <DialogDescription className="text-sm">
             Sign in to save your chat history and create custom GPTs
           </DialogDescription>
@@ -172,7 +172,7 @@ export function AuthModal({ open, onOpenChange }) {
               onClick={handleGoogleLogin}
               disabled={loading}
             >
-              <Chrome className="mr-2 h-4 w-4" />
+              <Chrome className="h-4 w-4" />
               Google
             </Button>
           </TabsContent>
@@ -233,7 +233,7 @@ export function AuthModal({ open, onOpenChange }) {
               onClick={handleGoogleLogin}
               disabled={loading}
             >
-              <Chrome className="mr-2 h-4 w-4" />
+              <Chrome className="h-4 w-4" />
               Google
             </Button>
           </TabsContent>

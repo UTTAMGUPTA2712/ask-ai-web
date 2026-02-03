@@ -200,7 +200,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
 
         <div className="px-4 pb-2 space-y-2">
           <Button onClick={onNewChat} className="w-full h-11" size="sm">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="h-4 w-4" />
             New Chat
           </Button>
 
@@ -210,7 +210,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
             className="w-full h-11"
             size="sm"
           >
-            <Library className="mr-2 h-4 w-4" />
+            <Library className="h-4 w-4" />
             Custom GPTs
           </Button>
         </div>
@@ -229,7 +229,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
                     size="sm"
                     onClick={() => handleGPTSelect(null)}
                   >
-                    <MessageSquare className="mr-2 h-4 w-4" />
+                    <MessageSquare className="h-4 w-4" />
                     Default
                   </Button>
                   {/* User's own GPTs */}
@@ -245,9 +245,9 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
                           title={isStarred ? "Starred by you" : ""}
                         >
                           {isStarred ? (
-                            <Star className="mr-2 h-4 w-4 text-yellow-400 fill-yellow-400" />
+                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                           ) : (
-                            <Sparkles className="mr-2 h-4 w-4" />
+                            <Sparkles className="h-4 w-4" />
                           )}
                           <span className="truncate">{gpt.name}</span>
                         </Button>
@@ -274,7 +274,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
                         onClick={() => handleGPTSelect(gpt)}
                         title={`By ${gpt.creator_name}`}
                       >
-                        <Sparkles className="mr-2 h-4 w-4 text-yellow-400" />
+                        <Sparkles className="h-4 w-4 text-yellow-400" />
                         {gpt.name}
                       </Button>
                     ))}
@@ -299,7 +299,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
                   size="sm"
                   onClick={() => handleChatSelect(chat)}
                 >
-                  <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
                   <span className="truncate">{chat.title || 'New Chat'}</span>
                 </Button>
               ))}
@@ -327,11 +327,11 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleTheme(); }} className="cursor-pointer">
-                  <Sun className="mr-2 h-4 w-4" />
+                  <Sun className="h-4 w-4" />
                   Toggle Theme
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="h-4 w-4" />
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -348,7 +348,7 @@ export function Sidebar({ onNewChat, onAuthClick, isOpen, onClose }) {
                 className="w-full h-10"
                 onClick={onAuthClick}
               >
-                <User className="mr-2 h-4 w-4" />
+                <User className="h-4 w-4" />
                 Sign In
               </Button>
             </div>

@@ -5,7 +5,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'AI Chat - Powered by Groq',
+  title: 'Ask AI - Powered by Groq',
   description: 'ChatGPT-like interface with custom GPTs',
 };
 

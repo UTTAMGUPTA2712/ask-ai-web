@@ -162,7 +162,7 @@ export function CustomGPTGallery({ open, onOpenChange, onCreateNew }) {
                                     />
                                 </div>
                                 <Button onClick={onCreateNew} className="h-11 whitespace-nowrap">
-                                    <Plus className="mr-2 h-4 w-4" />
+                                    <Plus className="h-4 w-4" />
                                     Create New GPT
                                 </Button>
                             </div>
@@ -192,7 +192,7 @@ export function CustomGPTGallery({ open, onOpenChange, onCreateNew }) {
                                             </p>
                                             {!searchQuery && activeTab !== 'starred' && (
                                                 <Button onClick={onCreateNew} variant="outline" className="mt-4">
-                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    <Plus className="h-4 w-4" />
                                                     Create Your First GPT
                                                 </Button>
                                             )}

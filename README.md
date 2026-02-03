@@ -1,4 +1,4 @@
-# AI Chat Application
+# Ask AI Application
 
 A ChatGPT-like chat application with custom GPTs, built with Next.js, Supabase, and Groq AI.
 
