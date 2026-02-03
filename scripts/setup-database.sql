@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT,
   password TEXT, -- Plain text as per requirement (NOT SECURE - DEMO ONLY)
   google_id TEXT,
+  starred_gpt_ids TEXT[] DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS custom_gpts (
   name TEXT NOT NULL,
   description TEXT,
   system_prompt TEXT NOT NULL,
+  is_public BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -42,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id);
 CREATE INDEX IF NOT EXISTS idx_chats_guest_ip ON chats(guest_ip);
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_custom_gpts_user_id ON custom_gpts(user_id);
+CREATE INDEX IF NOT EXISTS idx_custom_gpts_public ON custom_gpts(is_public);
 
 -- Enable Row Level Security (RLS) - Optional for demo
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;

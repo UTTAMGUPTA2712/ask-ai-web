@@ -27,7 +27,7 @@ export function AuthModal({ open, onOpenChange }) {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      
+
       if (error) throw error;
     } catch (error) {
       toast.error('Failed to sign in with Google');
@@ -45,7 +45,7 @@ export function AuthModal({ open, onOpenChange }) {
 
     try {
       setLoading(true);
-      
+
       // Create user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -113,48 +113,50 @@ export function AuthModal({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Welcome to AI Chat</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl sm:text-2xl">Welcome to AI Chat</DialogTitle>
+          <DialogDescription className="text-sm">
             Sign in to save your chat history and create custom GPTs
           </DialogDescription>
         </DialogHeader>
-        
+
         <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Sign In</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 h-11">
+            <TabsTrigger value="signin" className="text-sm">Sign In</TabsTrigger>
+            <TabsTrigger value="signup" className="text-sm">Sign Up</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="signin" className="space-y-4">
+
+          <TabsContent value="signin" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="signin-email">Email</Label>
+              <Label htmlFor="signin-email" className="text-sm">Email</Label>
               <Input
                 id="signin-email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="h-11 text-base"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signin-password">Password</Label>
+              <Label htmlFor="signin-password" className="text-sm">Password</Label>
               <Input
                 id="signin-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-11 text-base"
               />
             </div>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full h-11"
               onClick={handleEmailSignIn}
               disabled={loading}
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
-            
+
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -163,10 +165,10 @@ export function AuthModal({ open, onOpenChange }) {
                 <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
-            
+
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-11"
               onClick={handleGoogleLogin}
               disabled={loading}
             >
@@ -174,45 +176,48 @@ export function AuthModal({ open, onOpenChange }) {
               Google
             </Button>
           </TabsContent>
-          
-          <TabsContent value="signup" className="space-y-4">
+
+          <TabsContent value="signup" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="signup-name">Name</Label>
+              <Label htmlFor="signup-name" className="text-sm">Name</Label>
               <Input
                 id="signup-name"
                 type="text"
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="h-11 text-base"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-email">Email</Label>
+              <Label htmlFor="signup-email" className="text-sm">Email</Label>
               <Input
                 id="signup-email"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="h-11 text-base"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-password">Password</Label>
+              <Label htmlFor="signup-password" className="text-sm">Password</Label>
               <Input
                 id="signup-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-11 text-base"
               />
             </div>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full h-11"
               onClick={handleEmailSignUp}
               disabled={loading}
             >
               {loading ? 'Creating account...' : 'Create Account'}
             </Button>
-            
+
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -221,10 +226,10 @@ export function AuthModal({ open, onOpenChange }) {
                 <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
-            
+
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-11"
               onClick={handleGoogleLogin}
               disabled={loading}
             >
