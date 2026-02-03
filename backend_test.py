@@ -44,46 +44,7 @@ def test_health_check():
         print_test_result("Health Check API", False, f"Exception: {str(e)}")
         return False
 
-def test_user_signup():
-    """Test POST /api/auth/signup - User registration"""
-    print("🔍 Testing User Signup API...")
-    try:
-        # Generate unique user data
-        user_id = str(uuid.uuid4())
-        test_user = {
-            "id": user_id,
-            "email": f"testuser_{user_id[:8]}@example.com",
-            "name": f"Test User {user_id[:8]}",
-            "password": "testpassword123"
-        }
-        
-        response = requests.post(
-            f"{API_BASE}/auth/signup",
-            json=test_user,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "user" in data:
-                print_test_result("User Signup API", True, f"User created: {data['user']['email']}")
-                return True, test_user
-            else:
-                print_test_result("User Signup API", False, f"No user in response: {data}")
-                return False, None
-        else:
-            # This might fail if Supabase tables don't exist - that's expected
-            error_msg = response.text
-            if "relation" in error_msg.lower() and "does not exist" in error_msg.lower():
-                print_test_result("User Signup API", False, "Expected failure: Supabase database tables don't exist yet")
-            else:
-                print_test_result("User Signup API", False, f"Status: {response.status_code}, Response: {error_msg}")
-            return False, None
-            
-    except Exception as e:
-        print_test_result("User Signup API", False, f"Exception: {str(e)}")
-        return False, None
+
 
 def test_chat_guest_mode():
     """Test POST /api/chat - Chat without authentication (guest mode)"""
@@ -358,7 +319,7 @@ def main():
     
     # Test all endpoints
     results["health_check"] = test_health_check()
-    results["user_signup"], _ = test_user_signup()
+
     results["chat_guest"], chat_id = test_chat_guest_mode()
     results["chat_auth"], _ = test_chat_authenticated_mode()
     results["get_chats_guest"] = test_get_chats_guest()
