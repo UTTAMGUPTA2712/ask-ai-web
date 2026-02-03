@@ -1,0 +1,109 @@
+'use client';
+
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { getAuthHeaders } from '@/lib/utils/getAuthHeaders';
+import { toast } from 'sonner';
+
+export function CustomGPTModal({ open, onOpenChange, onCreated }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async () => {
+    if (!name || !systemPrompt) {
+      toast.error('Please provide a name and system prompt');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/custom-gpts', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name,
+          description,
+          system_prompt: systemPrompt,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create custom GPT');
+      }
+
+      toast.success('Custom GPT created successfully!');
+      setName('');
+      setDescription('');
+      setSystemPrompt('');
+      onOpenChange(false);
+      if (onCreated) onCreated();
+    } catch (error) {
+      toast.error(error.message || 'Failed to create custom GPT');
+      console.error('Create GPT error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Create Custom GPT</DialogTitle>
+          <DialogDescription>
+            Create a custom AI personality with a specific system prompt
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="gpt-name">Name</Label>
+            <Input
+              id="gpt-name"
+              placeholder="e.g., Python Tutor, Creative Writer"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="gpt-description">Description (Optional)</Label>
+            <Input
+              id="gpt-description"
+              placeholder="Brief description of this GPT"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="gpt-prompt">System Prompt</Label>
+            <Textarea
+              id="gpt-prompt"
+              placeholder="e.g., You are an expert Python tutor. Help users learn Python programming with clear explanations and examples."
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              rows={6}
+            />
+          </div>
+          
+          <Button 
+            className="w-full" 
+            onClick={handleCreate}
+            disabled={loading}
+          >
+            {loading ? 'Creating...' : 'Create Custom GPT'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
